@@ -142,7 +142,7 @@ export default function Navbar() {
                 className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 font-bold"
               >
                 <Building2 className="w-4 h-4" />
-                Register Theater
+                Register as Admin
               </Link>
 
               <Link

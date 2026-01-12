@@ -2,11 +2,12 @@ import express from "express";
 import Theater from "../models/theater.js";
 import User from "../models/user.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import Organization from "../models/organization.js";
 
 const router = express.Router();
 
 router.post("/register", requireAuth, async (req, res) => {
-    const { name, location, description } = req.body;
+    const { name, location, description, organizationName, organizationDescription } = req.body;
     const clerkId = req.auth.userId;
 
     try {
@@ -19,21 +20,37 @@ router.post("/register", requireAuth, async (req, res) => {
             return res.status(400).json({ message: "User already has an administrative role" });
         }
 
+        // Create Organization first
+        const organization = await Organization.create({
+            name: organizationName || `${name} Organization`,
+            description: organizationDescription || `Organization for ${name}`,
+            adminId: user._id,
+        });
+
+        // Create Theater linked to Organization
         const theater = await Theater.create({
             name,
             location,
             description,
             ownerId: user._id,
+            organizationId: organization._id,
+            screens: req.body.screens || [],
         });
 
+        // Update Organization with theaterId
+        organization.theaterId = theater._id;
+        await organization.save();
+
+        // Update User with role and organizationId
         user.role = "admin";
         user.theaterId = theater._id;
+        user.organizationId = organization._id;
         await user.save();
 
-        res.status(201).json({ theater, user });
+        res.status(201).json({ theater, organization, user });
     } catch (error) {
-        console.error("Error registering theater:", error);
-        res.status(500).json({ message: "Error registering theater", error: error.message });
+        console.error("Error registering theater and organization:", error);
+        res.status(500).json({ message: "Error registering theater and organization", error: error.message });
     }
 });
 
@@ -49,6 +66,56 @@ router.get("/", requireAuth, async (req, res) => {
         res.json(theaters);
     } catch (error) {
         res.status(500).json({ message: "Error fetching theaters" });
+    }
+});
+
+// Get current user's theater and organization
+router.get("/me", requireAuth, async (req, res) => {
+    const clerkId = req.auth.userId;
+
+    try {
+        const user = await User.findOne({ clerkId });
+        if (!user || !user.theaterId) {
+            return res.status(404).json({ message: "Theater not found" });
+        }
+
+        const theater = await Theater.findById(user.theaterId).populate("organizationId");
+        res.json(theater);
+    } catch (error) {
+        console.error("Error fetching theater/organization details:", error);
+        res.status(500).json({ message: "Error fetching details" });
+    }
+});
+
+// Update current user's theater and organization
+router.put("/me", requireAuth, async (req, res) => {
+    const { name, location, description, organizationName, organizationDescription, screens } = req.body;
+    const clerkId = req.auth.userId;
+
+    try {
+        const user = await User.findOne({ clerkId });
+        if (!user || !user.organizationId || !user.theaterId) {
+            return res.status(404).json({ message: "Admin organization or theater not found" });
+        }
+
+        // Update Theater
+        const theater = await Theater.findByIdAndUpdate(
+            user.theaterId,
+            { name, location, description, screens },
+            { new: true }
+        );
+
+        // Update Organization
+        const organization = await Organization.findByIdAndUpdate(
+            user.organizationId,
+            { name: organizationName, description: organizationDescription },
+            { new: true }
+        );
+
+        res.json({ theater, organization });
+    } catch (error) {
+        console.error("Error updating theater/organization:", error);
+        res.status(500).json({ message: "Error updating details", error: error.message });
     }
 });
 

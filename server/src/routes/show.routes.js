@@ -2,6 +2,8 @@ import express from "express";
 import Show from "../models/show.js";
 import { generateSeats } from "../utils/generateSeats.js";
 import { isAdmin } from "../middleware/auth.middleware.js";
+import Theater from "../models/theater.js";
+import OrganizationMovie from "../models/organizationMovie.js";
 
 const router = express.Router();
 
@@ -37,14 +39,44 @@ const router = express.Router();
  */
 router.post("/", isAdmin, async (req, res) => {
   try {
-    const { movie, date, time, price, theaterId } = req.body;
+    const { movie, date, time, price, theaterId, screenId } = req.body;
 
     let finalTheaterId = theaterId;
+    let organizationId = req.dbUser.organizationId;
+
     if (req.dbUser.role === "admin") {
       finalTheaterId = req.dbUser.theaterId;
-    } else if (req.dbUser.role === "super_admin" && !theaterId) {
-      return res.status(400).json({ message: "Super Admin must provide theaterId" });
+    } else if (req.dbUser.role === "super_admin") {
+      if (!theaterId) {
+        return res.status(400).json({ message: "Super Admin must provide theaterId" });
+      }
+      // For super_admin, we might need to fetch the theater to get its orgId
+      const theater = await Theater.findById(theaterId);
+      if (!theater) return res.status(404).json({ message: "Theater not found" });
+      organizationId = theater.organizationId;
     }
+
+    if (!screenId) {
+      return res.status(400).json({ message: "screenId is required" });
+    }
+
+    // NEW: Validate if movie is in organization's collection
+    const isMovieEnabled = await OrganizationMovie.findOne({
+      organizationId,
+      movieId: movie,
+      isActive: true
+    });
+
+    if (!isMovieEnabled) {
+      return res.status(403).json({
+        message: "Movie must be added to your organization's library before scheduling shows."
+      });
+    }
+
+    // Get screen capacity for seat generation
+    const theater = await Theater.findById(finalTheaterId);
+    const screen = theater.screens.id(screenId);
+    if (!screen) return res.status(404).json({ message: "Screen not found in this theater" });
 
     const show = await Show.create({
       movie,
@@ -52,7 +84,9 @@ router.post("/", isAdmin, async (req, res) => {
       time,
       price,
       theaterId: finalTheaterId,
-      seats: generateSeats(),
+      screenId,
+      organizationId,
+      seats: generateSeats(screen.capacity),
     });
 
     res.status(201).json(show);
@@ -77,10 +111,19 @@ router.post("/", isAdmin, async (req, res) => {
  *       200:
  *         description: List of shows
  */
-router.get("/movie/:movieId", async (req, res) => {
+/**
+ * @swagger
+ * /shows/me:
+ *   get:
+ *     summary: Get shows for current admin's theater
+ *     tags: [Shows]
+ */
+router.get("/me", isAdmin, async (req, res) => {
   try {
-    const shows = await Show.find({ movie: req.params.movieId })
-      .populate("movie");
+    const query = { theaterId: req.dbUser.theaterId };
+    const shows = await Show.find(query)
+      .populate("movie")
+      .sort({ date: 1, time: 1 });
 
     res.json(shows);
   } catch (error) {

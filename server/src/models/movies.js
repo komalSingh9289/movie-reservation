@@ -15,18 +15,18 @@ const movieSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    duration: {
+    language: {
       type: String,
+      required: true,
+      default: "English",
+    },
+    releaseDate: {
+      type: Date,
       required: true,
     },
     isActive: {
       type: Boolean,
       default: true,
-    },
-    theaterId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Theater",
-      required: true,
     },
   },
   {

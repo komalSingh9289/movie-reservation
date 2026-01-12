@@ -16,37 +16,38 @@ router.post("/sync", requireAuth, async (req, res) => {
   console.log("Sync requested for:", { clerkId, email });
 
   try {
-    let user = await User.findOne({ clerkId });
+    // 1. Check if super_admin exists
+    const superAdminExists = await User.findOne({ role: "super_admin" });
 
-    if (!user) {
-      // Check if this is the first user overall
-      const userCount = await User.countDocuments();
-      const role = userCount === 0 ? "super_admin" : "user";
-      console.log(`Creating NEW user with role: ${role}`);
+    // 2. Atomic Upsert (Avoid ConflictingUpdateOperators by separating fields)
+    const setQuery = {};
+    const setOnInsertQuery = {
+      role: superAdminExists ? "user" : "super_admin"
+    };
 
-      user = await User.create({
-        clerkId,
-        name,
-        email,
-        avatar,
-        role,
-      });
+    if (name) {
+      setQuery.name = name;
     } else {
-      // Healing logic: If this user exists but there's no super_admin in the system yet,
-      // and they are the first user (or one of the users), assign them super_admin.
-      const superAdminExists = await User.findOne({ role: "super_admin" });
-      if (!superAdminExists) {
-        console.log("No super_admin found in system, promoting current user to super_admin");
-        user.role = "super_admin";
-      }
-
-      // Update existing user details if they've changed
-      user.name = name || user.name;
-      user.email = email || user.email;
-      user.avatar = avatar || user.avatar;
-      await user.save();
+      setOnInsertQuery.name = "Anonymous";
     }
 
+    if (email) setQuery.email = email;
+    if (avatar) setQuery.avatar = avatar;
+
+    const user = await User.findOneAndUpdate(
+      { clerkId },
+      {
+        $set: setQuery,
+        $setOnInsert: setOnInsertQuery
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
+
+    console.log(`Sync complete for: ${clerkId}. Role: ${user.role}`);
     res.json(user);
   } catch (error) {
     console.error("DETAILED Error syncing user:", error);

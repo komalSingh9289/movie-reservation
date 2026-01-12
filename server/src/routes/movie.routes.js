@@ -36,16 +36,22 @@ const router = express.Router();
  */
 router.post("/", isAdmin, async (req, res) => {
   try {
-    const movieData = { ...req.body };
-
-    // Automatically scope to theater if theater_admin
-    if (req.dbUser.role === "admin") {
-      movieData.theaterId = req.dbUser.theaterId;
-    } else if (req.dbUser.role === "super_admin" && !movieData.theaterId) {
-      return res.status(400).json({ message: "Super Admin must provide theaterId" });
+    // Only super_admin can create global movies
+    if (req.dbUser.role !== "super_admin") {
+      return res.status(403).json({ message: "Only super admins can create global movies" });
     }
 
-    const movie = await Movie.create(movieData);
+    const { title, description, poster, duration, language, releaseDate } = req.body;
+
+    const movie = await Movie.create({
+      title,
+      description,
+      poster,
+      duration,
+      language,
+      releaseDate: new Date(releaseDate)
+    });
+
     res.status(201).json(movie);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -63,12 +69,8 @@ router.post("/", isAdmin, async (req, res) => {
  *         description: List of movies
  */
 router.get("/", async (req, res) => {
-  const { theaterId } = req.query;
   try {
-    const query = { isActive: true };
-    if (theaterId) query.theaterId = theaterId;
-
-    const movies = await Movie.find(query);
+    const movies = await Movie.find({ isActive: true }).sort({ createdAt: -1 });
     res.json(movies);
   } catch (error) {
     res.status(500).json({ message: error.message });

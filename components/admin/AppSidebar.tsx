@@ -29,18 +29,18 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 const superAdminItems = [
-  { name: "Global Overview", icon: TrendingUp, href: "/admin" },
-  { name: "Theaters", icon: Building2, href: "/admin/theaters" },
-  { name: "User Directory", icon: Users, href: "/admin/users" },
-  { name: "Platform Settings", icon: Settings, href: "/admin/settings" },
+  { name: "Overview", icon: TrendingUp, href: "/admin" },
+  { name: "Movies", icon: Film, href: "/admin/movies" },
+  { name: "Organizations", icon: Building2, href: "/admin/organizations" },
+  { name: "Users", icon: Users, href: "/admin/users" },
 ];
 
 const theaterAdminItems = [
   { name: "Theater Hub", icon: TrendingUp, href: "/admin" },
-  { name: "My Movies", icon: Film, href: "/admin/movies" },
-  { name: "Show Times", icon: Calendar, href: "/admin/shows" },
-  { name: "Local Users", icon: Users, href: "/admin/users" },
-  { name: "Venue Settings", icon: Settings, href: "/admin/settings" },
+  { name: "Shows", icon: Calendar, href: "/admin/shows" },
+  { name: "Movie Library", icon: Film, href: "/admin/movies" },
+  { name: "Bookings", icon: Ticket, href: "/admin/bookings" },
+  { name: "Settings", icon: Settings, href: "/admin/settings" },
 ];
 
 export function AppSidebar({ role }: { role: string | null }) {

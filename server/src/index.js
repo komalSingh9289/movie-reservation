@@ -11,6 +11,7 @@ import showRoutes from "./routes/show.routes.js";
 import userRoutes from "./routes/user.route.js";
 import bookingRoutes from "./routes/booking.routes.js";
 import theaterRoutes from "./routes/theater.route.js";
+import organizationMovieRoutes from "./routes/organizationMovie.route.js";
 import { clerkMiddleware } from "@clerk/express";
 
 connectDB();
@@ -36,6 +37,7 @@ app.use("/shows", showRoutes);
 app.use("/users", userRoutes);
 app.use("/bookings", bookingRoutes);
 app.use("/theaters", theaterRoutes);
+app.use("/organization-movies", organizationMovieRoutes);
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

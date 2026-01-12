@@ -37,6 +37,12 @@ const userSchema = new mongoose.Schema(
         ref: "Booking",
       },
     ],
+
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+    },
   },
   { timestamps: true }
 );

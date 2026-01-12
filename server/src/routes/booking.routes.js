@@ -72,4 +72,46 @@ router.get("/user", requireAuth, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /bookings/theater:
+ *   get:
+ *     summary: Get theater-specific bookings (for admins)
+ *     tags: [Bookings]
+ */
+router.get("/theater", requireAuth, async (req, res) => {
+    try {
+        const auth = getAuth(req);
+        const user = await User.findOne({ clerkId: auth.userId });
+
+        if (!user || (user.role !== "admin" && user.role !== "super_admin")) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        let query = {};
+        if (user.role === "admin") {
+            query.theaterId = user.theaterId;
+        }
+
+        // We need to populate show to filter by theater if theaterId is in Show
+        // But let's check Booking model... usually it links to Show.
+        // If Booking doesn't have theaterId, we must filter via Show.
+
+        const bookings = await Booking.find()
+            .populate({
+                path: "show",
+                match: user.role === "admin" ? { theaterId: user.theaterId } : {},
+                populate: { path: "movie" }
+            })
+            .sort({ createdAt: -1 });
+
+        // Filter out bookings where show didn't match the theaterId (if admin)
+        const filteredBookings = bookings.filter(b => b.show !== null);
+
+        res.json(filteredBookings);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 export default router;

@@ -10,28 +10,29 @@ import { useAuth, useUser } from "@clerk/nextjs";
 export default function AdminDashboard() {
   const { user } = useUser();
   const { getToken } = useAuth();
+  // No need for a separate sync call here, DashboardLayout already does it.
+  // We can just rely on the user object from Clerk since we trust the backend scoping for other calls.
+  // However, to know if it's super_admin, we might want the role from the DB.
+  // DashboardLayout could theoretically pass it down, but for now let's just use the metadata or a single fetch if really needed.
+  // Let's assume we want to keep'dbUser' for the 'role' check specifically.
   const [dbUser, setDbUser] = useState<any>(null);
 
   useEffect(() => {
-    const fetchDbUser = async () => {
+    const fetchRole = async () => {
         const token = await getToken();
+        // Just fetch info, don't triggger sync logic again if possible (though findOneAndUpdate is safe)
         const res = await fetch("http://localhost:5000/users/sync", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-                clerkId: user?.id,
-                name: user?.fullName,
-                email: user?.primaryEmailAddress?.emailAddress,
-                avatar: user?.imageUrl,
-            }),
+            body: JSON.stringify({ clerkId: user?.id }),
         });
         const data = await res.json();
         setDbUser(data);
     };
-    if (user) fetchDbUser();
+    if (user) fetchRole();
   }, [user]);
 
   const isSuperAdmin = dbUser?.role === "super_admin";

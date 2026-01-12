@@ -12,7 +12,7 @@ const seatSchema = new mongoose.Schema(
       default: "available",
     },
     lockedBy: {
-      type: String, // socketId or userId
+      type: String, // userId or socketId
       default: null,
     },
     lockedAt: {
@@ -30,28 +30,47 @@ const showSchema = new mongoose.Schema(
       ref: "Movie",
       required: true,
     },
+
     date: {
-      type: String, // YYYY-MM-DD (simple for now)
+      type: String, // YYYY-MM-DD
       required: true,
     },
+
     time: {
       type: String, // HH:mm
       required: true,
     },
-    seats: [seatSchema],
+
     price: {
       type: Number,
       required: true,
     },
-    theaterId: {
+
+    theater: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Theater",
       required: true,
     },
+
+    screenId: {
+      type: mongoose.Schema.Types.ObjectId, // embedded screen _id
+      required: true,
+    },
+
+    organization: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+    },
+
+    seats: [seatSchema],
   },
   { timestamps: true }
 );
 
-const Show = mongoose.model("Show", showSchema);
+// 🔥 Performance & safety
+showSchema.index({ movie: 1, date: 1 });
+showSchema.index({ theater: 1 });
+showSchema.index({ organization: 1 });
 
-export default Show;
+export default mongoose.model("Show", showSchema);
