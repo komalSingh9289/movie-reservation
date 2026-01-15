@@ -1,20 +1,63 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { movies } from "@/data/movies";
 import { Button } from "@/components/ui/button";
-import { Star, Calendar, Search, Filter } from "lucide-react";
+import { Star, Calendar, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import axios from "axios";
 
-const categories = ["All", "Action", "Sci-Fi", "Crime", "Comedy", "Drama"];
+// Define Movie Interface matching backend response
+interface Movie {
+  _id: string;
+  title: string;
+  poster: string;
+  category: string;
+  duration: string;
+  rating?: number;
+  description: string;
+}
 
 export default function MoviesPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [moviesRes, categoriesRes] = await Promise.all([
+          axios.get("http://localhost:5000/movies"),
+          axios.get("http://localhost:5000/categories")
+        ]);
+
+        setMovies(moviesRes.data);
+        
+        // Map category objects to names or use ID if preferred. 
+        // Showing names as per requirement "show all category names here"
+        // Assuming category object has 'name' field based on route file inspection.
+        if (categoriesRes.data && Array.isArray(categoriesRes.data)) {
+           const categoryNames = categoriesRes.data.map((c: any) => c.name);
+           setCategories(["All", ...categoryNames]);
+        }
+        
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const filteredMovies = movies.filter(movie => {
-    const matchesCategory = activeCategory === "All" || movie.category === activeCategory;
+    // Note: Backend might return 'category' or 'genre'. Adjust if needed.
+    // Assuming backend data has 'category' field.
+    const matchesCategory = activeCategory === "All" || (movie.category && movie.category.includes(activeCategory)); 
     const matchesSearch = movie.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -64,11 +107,15 @@ export default function MoviesPage() {
         </div>
 
         {/* Movie Grid */}
-        {filteredMovies.length > 0 ? (
+        {loading ? (
+           <div className="flex justify-center items-center py-32">
+             <Loader2 className="h-10 w-10 text-purple-500 animate-spin" />
+           </div>
+        ) : filteredMovies.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
             {filteredMovies.map((movie) => (
-              <div key={movie.id} className="group relative flex flex-col bg-zinc-900/30 rounded-xl overflow-hidden border border-zinc-800/50 hover:border-purple-500/40 transition-all duration-300 hover:-translate-y-2">
-                <div className="overflow-hidden relative">
+              <div key={movie._id} className="group relative flex flex-col bg-zinc-900/30 rounded-xl overflow-hidden border border-zinc-800/50 hover:border-purple-500/40 transition-all duration-300 hover:-translate-y-2">
+                <div className="overflow-hidden relative aspect-[2/3]">
                   <img 
                     src={movie.poster} 
                     alt={movie.title}
@@ -76,24 +123,24 @@ export default function MoviesPage() {
                   />
                   <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold flex items-center gap-1">
                     <Star className="h-2.5 w-2.5 text-yellow-400 fill-yellow-400" />
-                    {movie.rating || "8.5"}
+                    {movie.rating || "N/A"}
                   </div>
                 </div>
                 
-                <div className="p-4 space-y-2">
+                <div className="p-4 space-y-2 flex-1 flex flex-col">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">{movie.category || "Sci-Fi"}</span>
+                    <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">{movie.category || "General"}</span>
                     <span className="text-[10px] text-zinc-500 flex items-center gap-1">
                       <Calendar className="h-2.5 w-2.5" />
                       {movie.duration}
                     </span>
                   </div>
                   <h3 className="text-sm font-bold group-hover:text-purple-400 transition-colors line-clamp-1">{movie.title}</h3>
-                  <p className="text-zinc-500 text-[11px] line-clamp-2 leading-relaxed h-8">
+                  <p className="text-zinc-500 text-[11px] line-clamp-2 leading-relaxed flex-grow">
                     {movie.description}
                   </p>
                   
-                  <Link href={`/movies/${movie.id}`} className="block pt-2">
+                  <Link href={`/movies/${movie._id}`} className="block pt-2 mt-auto">
                     <Button variant="secondary" size="sm" className="w-full h-9 text-xs bg-zinc-800/50 hover:bg-purple-600 hover:text-white border border-zinc-700/50 transition-all duration-300">
                       Book Now
                     </Button>

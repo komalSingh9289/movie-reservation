@@ -46,6 +46,20 @@ router.post("/", isAdmin, async (req, res) => {
 
     if (req.dbUser.role === "admin") {
       finalTheaterId = req.dbUser.theaterId;
+
+      // Fallback: If user doesn't have theaterId/orgId populated, find their organization
+      if (!finalTheaterId || !organizationId) {
+        const org = await import("../models/organization.js").then(m => m.default.findOne({ adminId: req.dbUser._id }));
+        if (org) {
+          finalTheaterId = org.theaterId;
+          organizationId = org._id;
+        }
+      }
+
+      if (!finalTheaterId) {
+        return res.status(400).json({ message: "No theater associated with this admin account." });
+      }
+
     } else if (req.dbUser.role === "super_admin") {
       if (!theaterId) {
         return res.status(400).json({ message: "Super Admin must provide theaterId" });
@@ -83,9 +97,9 @@ router.post("/", isAdmin, async (req, res) => {
       date,
       time,
       price,
-      theaterId: finalTheaterId,
+      theater: finalTheaterId,
       screenId,
-      organizationId,
+      organization: organizationId,
       seats: generateSeats(screen.capacity),
     });
 
@@ -120,10 +134,46 @@ router.post("/", isAdmin, async (req, res) => {
  */
 router.get("/me", isAdmin, async (req, res) => {
   try {
-    const query = { theaterId: req.dbUser.theaterId };
+    let theaterId = req.dbUser.theaterId;
+
+    if (!theaterId) {
+      const org = await import("../models/organization.js").then(m => m.default.findOne({ adminId: req.dbUser._id }));
+      if (org) {
+        theaterId = org.theaterId;
+      }
+    }
+
+    if (!theaterId) {
+      return res.status(404).json({ message: "Theater not found" });
+    }
+
+    // Query using 'theater' field as defined in schema
+    const query = { theater: theaterId };
     const shows = await Show.find(query)
       .populate("movie")
       .sort({ date: 1, time: 1 });
+
+    res.json(shows);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /shows/upcoming:
+ *   get:
+ *     summary: Get upcoming shows sorted by date and time
+ *     tags: [Shows]
+ */
+router.get("/upcoming", async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const shows = await Show.find({ date: { $gte: today } })
+      .populate("movie")
+      .populate("theater") // Populate theater to show name
+      .sort({ date: 1, time: 1 })
+      .limit(5);
 
     res.json(shows);
   } catch (error) {

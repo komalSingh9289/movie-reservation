@@ -12,6 +12,8 @@ import userRoutes from "./routes/user.route.js";
 import bookingRoutes from "./routes/booking.routes.js";
 import theaterRoutes from "./routes/theater.route.js";
 import organizationMovieRoutes from "./routes/organizationMovie.route.js";
+import categoryRoutes from "./routes/category.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 import { clerkMiddleware } from "@clerk/express";
 
 connectDB();
@@ -38,6 +40,8 @@ app.use("/users", userRoutes);
 app.use("/bookings", bookingRoutes);
 app.use("/theaters", theaterRoutes);
 app.use("/organization-movies", organizationMovieRoutes);
+app.use("/categories", categoryRoutes);
+app.use("/admin", adminRoutes);
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

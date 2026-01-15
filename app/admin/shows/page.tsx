@@ -19,6 +19,9 @@ export default function ShowsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [filterMovie, setFilterMovie] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+
   const [formData, setFormData] = useState({
     movie: "",
     date: "",
@@ -103,6 +106,13 @@ export default function ShowsPage() {
     );
   }
 
+  // Filter Logic
+  const filteredShows = shows.filter(show => {
+    const matchesMovie = filterMovie ? show.movie?._id === filterMovie : true;
+    const matchesDate = filterDate ? show.date === filterDate : true;
+    return matchesMovie && matchesDate;
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-in fade-in duration-500">
@@ -120,9 +130,48 @@ export default function ShowsPage() {
           </Button>
         </div>
 
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-4 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-800/50">
+            <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Filters</span>
+            </div>
+            <div className="h-6 w-px bg-zinc-800" />
+            
+            <select
+                className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5 outline-none"
+                value={filterMovie}
+                onChange={(e) => setFilterMovie(e.target.value)}
+            >
+                <option value="">All Movies</option>
+                {movies?.map((m: any) => ( // Using movies state from parent logic which is list of IDs? Wait, logic says movies stores IDs? 
+                   // Let's check: setMovies(Array.isArray(moviesData) ? moviesData.map((m: any) => m.movieId) : []);
+                   // Yes, 'movies' state is an array of Movie objects populated from OrganizationMovies.
+                   <option key={m._id} value={m._id}>{m.title}</option>
+                ))}
+            </select>
+
+            <Input 
+                type="date"
+                className="w-auto bg-zinc-900 border-zinc-800 text-zinc-300 h-10"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+            />
+
+            {(filterMovie || filterDate) && (
+                <Button 
+                    variant="ghost" 
+                    onClick={() => { setFilterMovie(""); setFilterDate(""); }}
+                    className="text-red-400 hover:text-red-300 hover:bg-red-400/10 h-10 px-3"
+                >
+                    <X className="w-4 h-4 mr-2" /> Reset
+                </Button>
+            )}
+        </div>
+
         {/* Show List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {shows.length > 0 ? shows.map((show) => {
+            {filteredShows.length > 0 ? filteredShows.map((show) => {
                 const screen = theater?.screens?.find((s: any) => s._id === show.screenId);
                 return (
                     <Card key={show._id} className="bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 transition-all rounded-3xl overflow-hidden group">
@@ -173,7 +222,7 @@ export default function ShowsPage() {
             }) : (
                 <div className="col-span-full py-24 text-center border-2 border-dashed border-zinc-900 rounded-3xl">
                     <Calendar className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
-                    <p className="text-zinc-500 font-medium">No shows scheduled yet for this venue.</p>
+                    <p className="text-zinc-500 font-medium">No shows found matching your filters.</p>
                 </div>
             )}
         </div>

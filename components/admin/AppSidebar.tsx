@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 const superAdminItems = [
   { name: "Overview", icon: TrendingUp, href: "/admin" },
   { name: "Movies", icon: Film, href: "/admin/movies" },
+  { name: "Categories", icon: Calendar, href: "/admin/categories" },
   { name: "Organizations", icon: Building2, href: "/admin/organizations" },
   { name: "Users", icon: Users, href: "/admin/users" },
 ];

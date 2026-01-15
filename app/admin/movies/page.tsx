@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
 import { Search, Film } from "lucide-react";
+import api from "@/lib/axios";
 import { Input } from "@/components/ui/input";
 import { useAuth, useUser } from "@clerk/nextjs";
 import MovieCard from "@/components/admin/movies/MovieCard";
@@ -17,6 +18,8 @@ export default function AdminMoviesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [editingMovie, setEditingMovie] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -84,6 +87,32 @@ export default function AdminMoviesPage() {
     }
   };
 
+  // New functions for edit/delete
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this movie?")) return;
+    try {
+        const token = await getToken();
+        await api.delete(`/movies/${id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        fetchData(); // Re-fetch data after deletion
+    } catch (error) {
+        console.error("Error deleting movie:", error);
+        alert("Failed to delete movie");
+    }
+  };
+
+  const handleEdit = (movie: any) => {
+    setEditingMovie(movie);
+    setIsEditModalOpen(true);
+  };
+
+  const handleMovieUpdated = () => {
+    fetchData(); // Re-fetch data after update
+    setEditingMovie(null);
+    setIsEditModalOpen(false); // Close modal after update
+  };
+    
   const isSuperAdmin = dbUser?.role === "super_admin";
   const filteredMovies = globalMovies.filter(m => 
     m.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -138,6 +167,8 @@ export default function AdminMoviesPage() {
               isSuperAdmin={isSuperAdmin}
               onAdd={addToCollection}
               addingId={addingId}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
           ))}
         </div>
@@ -148,6 +179,17 @@ export default function AdminMoviesPage() {
             <p className="text-zinc-500 font-bold uppercase tracking-widest">No movies found in catalog.</p>
           </div>
         )}
+
+        {/* Edit Modal */}
+        <AddMovieModal 
+            open={isEditModalOpen} 
+            onOpenChange={(open) => {
+                setIsEditModalOpen(open);
+                if (!open) setEditingMovie(null);
+            }}
+            movieToEdit={editingMovie} 
+            onMovieAdded={handleMovieUpdated} 
+        />
       </div>
     </DashboardLayout>
   );

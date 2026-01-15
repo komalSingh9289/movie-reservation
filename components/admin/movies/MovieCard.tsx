@@ -10,6 +10,8 @@ interface MovieCardProps {
   isSuperAdmin?: boolean;
   onAdd?: (id: string) => void;
   addingId?: string | null;
+  onEdit?: (movie: any) => void;
+  onDelete?: (id: string) => void;
 }
 
 export default function MovieCard({
@@ -18,6 +20,8 @@ export default function MovieCard({
   isSuperAdmin,
   onAdd,
   addingId,
+  onEdit,
+  onDelete,
 }: MovieCardProps) {
   return (
     <Card className="bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 transition-all rounded-2xl overflow-hidden w-full max-w-[260px]">
@@ -82,7 +86,8 @@ export default function MovieCard({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 h-8 text-[9px] uppercase tracking-widest border-zinc-700"
+              className="flex-1 h-8 text-[9px] uppercase tracking-widest border-zinc-700 hover:bg-zinc-800 text-white"
+              onClick={() => onEdit?.(movie)}
             >
               Edit
             </Button>
@@ -90,6 +95,7 @@ export default function MovieCard({
               size="sm"
               variant="outline"
               className="flex-1 h-8 text-[9px] uppercase tracking-widest border-zinc-700 text-rose-400 hover:bg-rose-500/10"
+              onClick={() => onDelete?.(movie._id)}
             >
               Delete
             </Button>

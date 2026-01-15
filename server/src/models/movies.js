@@ -24,6 +24,14 @@ const movieSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    duration: {
+      type: String,
+      required: true,
+    },
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+    },
     isActive: {
       type: Boolean,
       default: true,

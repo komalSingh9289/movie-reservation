@@ -1,7 +1,8 @@
 "use client";
 
 import DashboardLayout from "@/components/admin/DashboardLayout";
-import { Users, Film, Ticket, TrendingUp, Plus, Settings, ChevronRight, Building2 } from "lucide-react";
+import { Users, Film, Ticket, TrendingUp, Plus, ChevronRight, Building2, Store, Calendar, StopCircle } from "lucide-react";
+import api from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -10,67 +11,162 @@ import { useAuth, useUser } from "@clerk/nextjs";
 export default function AdminDashboard() {
   const { user } = useUser();
   const { getToken } = useAuth();
-  // No need for a separate sync call here, DashboardLayout already does it.
-  // We can just rely on the user object from Clerk since we trust the backend scoping for other calls.
-  // However, to know if it's super_admin, we might want the role from the DB.
-  // DashboardLayout could theoretically pass it down, but for now let's just use the metadata or a single fetch if really needed.
-  // Let's assume we want to keep'dbUser' for the 'role' check specifically.
   const [dbUser, setDbUser] = useState<any>(null);
+  // State for simplified stats mapping
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [statsData, setStatsData] = useState({
+    revenue: 0,
+    theaters: 0,
+    users: 0,
+    tickets: 0,
+    movies: 0
+  });
+  const [recentMovies, setRecentMovies] = useState([]);
+  const [upcomingShows, setUpcomingShows] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchRole = async () => {
+    const fetchDashboardData = async () => {
+      if (!user) return;
+
+      try {
         const token = await getToken();
-        // Just fetch info, don't triggger sync logic again if possible (though findOneAndUpdate is safe)
-        const res = await fetch("http://localhost:5000/users/sync", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ clerkId: user?.id }),
+        
+        // 1. Sync/Fetch User Role
+        const userRes = await api.post("/users/sync", { clerkId: user.id }, {
+            headers: { Authorization: `Bearer ${token}` }
         });
-        const data = await res.json();
-        setDbUser(data);
+        const currentUser = userRes.data;
+        setDbUser(currentUser);
+
+        if (currentUser.role === 'super_admin' || currentUser.role === 'admin') {
+            // Fetch comprehensive stats for BOTH roles (endpoint now handles both)
+            const statsRes = await api.get("/admin/stats", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setAdminStats(statsRes.data);
+            
+             // Fetch Recent Movies (keep existing logic for table)
+            const moviesRes = await api.get("/movies", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setRecentMovies(moviesRes.data.slice(0, 5));
+
+            // Fetch Upcoming Shows (keep existing logic)
+             const showsRes = await api.get("/shows/upcoming", {
+                headers: { Authorization: `Bearer ${token}` }
+           });
+           setUpcomingShows(showsRes.data);
+
+        } else {
+             // Fallback for regular user or error state?
+             // Should not happen on admin page.
+        }
+
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
     };
-    if (user) fetchRole();
+
+    fetchDashboardData();
   }, [user]);
 
   const isSuperAdmin = dbUser?.role === "super_admin";
 
-  const stats = [
+  // Super Admin Stats: 5 Cards Grid (Screens Removed)
+  const superAdminStats = adminStats ? [
     {
-      title: isSuperAdmin ? "Total Monthly Revenue" : "Monthly Revenue",
-      value: isSuperAdmin ? "₹8,45,200" : "₹1,24,500",
-      change: "+12.5%",
-      icon: TrendingUp,
-      color: "text-emerald-400",
-      bg: "bg-emerald-500/10",
-    },
-    {
-      title: isSuperAdmin ? "Total Theaters" : "Movie Catalog",
-      value: isSuperAdmin ? "24" : "156",
-      change: isSuperAdmin ? "+2 new" : "+4 new",
-      icon: isSuperAdmin ? Building2 : Film,
-      color: "text-purple-400",
-      bg: "bg-purple-500/10",
-    },
-    {
-      title: "Active Users",
-      value: "3,842",
-      change: "+18%",
-      icon: Users,
+      title: "Total Organizations",
+      value: adminStats.organizations?.total.toString(),
+      trend: adminStats.organizations?.trend,
+      icon: Building2,
       color: "text-blue-400",
       bg: "bg-blue-500/10",
     },
     {
-      title: "Tickets Sold",
-      value: "842",
-      change: "+24 today",
+      title: "Total Theaters",
+      value: adminStats.theaters?.total.toString(),
+      trend: adminStats.theaters?.trend,
+      icon: Store,
+      color: "text-purple-400",
+      bg: "bg-purple-500/10",
+    },
+    {
+      title: "Total Movies",
+      value: adminStats.movies?.total.toString(),
+      trend: adminStats.movies?.trend,
+      icon: Film,
+      color: "text-pink-400",
+      bg: "bg-pink-500/10",
+    },
+    {
+      title: "Active Shows Today",
+      value: adminStats.activeShows?.total.toString(),
+      trend: adminStats.activeShows?.trend,
+      icon: Calendar,
+      color: "text-emerald-400",
+      bg: "bg-emerald-500/10",
+    },
+    {
+      title: "Total Bookings",
+      value: adminStats.bookings?.total.toString(),
+      subValue: `${adminStats.bookings?.today} today / ${adminStats.bookings?.month} mth`, 
+      trend: "All time",
       icon: Ticket,
       color: "text-orange-400",
       bg: "bg-orange-500/10",
-    },
-  ];
+    }
+  ] : [];
+
+  // Theater Admin Stats 
+  const theaterAdminStats = adminStats ? [
+    {
+        title: "Monthly Revenue",
+        value: `₹${adminStats.revenue?.total?.toLocaleString() || 0}`,
+        trend: adminStats.revenue?.trend,
+        icon: TrendingUp,
+        color: "text-emerald-400",
+        bg: "bg-emerald-500/10",
+      },
+      {
+        title: "My Movie Catalog",
+        value: adminStats.movies?.total?.toString() || "0", 
+        trend: adminStats.movies?.trend,
+        icon: Film,
+        color: "text-purple-400",
+        bg: "bg-purple-500/10",
+      },
+      {
+        title: "Total Bookings",
+        value: adminStats.bookings?.total?.toString() || "0",
+        trend: adminStats.bookings?.trend,
+        icon: Ticket,
+        color: "text-orange-400",
+        bg: "bg-orange-500/10",
+      },
+      {
+        title: "Active Shows",
+        value: adminStats.activeShows?.total?.toString() || "0",
+        trend: adminStats.activeShows?.trend,
+        icon: Calendar,
+        color: "text-blue-400",
+        bg: "bg-blue-500/10",
+      },
+  ] : [];
+
+  const stats = isSuperAdmin ? superAdminStats : theaterAdminStats;
+
+  if (loading) {
+     return (
+        <DashboardLayout>
+            <div className="flex items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            </div>
+        </DashboardLayout>
+     )
+  }
 
   return (
     <DashboardLayout>
@@ -95,7 +191,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${isSuperAdmin ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
           {stats.map((stat) => (
             <Card
               key={stat.title}
@@ -106,13 +202,15 @@ export default function AdminDashboard() {
                     <div className={`p-2.5 rounded-lg ${stat.bg}`}>
                         <stat.icon className={`w-5 h-5 ${stat.color}`} />
                     </div>
-                    <span className={`text-[11px] font-bold ${stat.change.startsWith('+') ? 'text-emerald-400' : 'text-rose-400'} flex items-center gap-1`}>
-                        {stat.change} <TrendingUp className="w-3 h-3" />
-                    </span>
                 </div>
                 <div>
                     <h3 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">{stat.title}</h3>
                     <div className="text-2xl font-bold text-white mt-0.5 tracking-tight">{stat.value}</div>
+                    {/* Render subValue if present, otherwise change/trend */}
+                    {(stat as any).subValue && <p className="text-[10px] text-zinc-400 font-medium mt-1">{(stat as any).subValue}</p>}
+                    {(stat as any).trend && !(stat as any).subValue && <p className="text-[10px] text-emerald-400 font-bold mt-1">{(stat as any).trend}</p>}
+                     {/* Legacy 'change' support */}
+                    {(stat as any).change && !(stat as any).trend && !(stat as any).subValue && <p className="text-[10px] text-emerald-400 font-bold mt-1">{(stat as any).change}</p>}
                 </div>
               </CardContent>
             </Card>
@@ -121,32 +219,37 @@ export default function AdminDashboard() {
 
         {/* Content Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Activity */}
+          {/* Recent Movies */}
           <Card className="bg-zinc-900/40 border-zinc-900 rounded-2xl overflow-hidden">
                 <CardHeader className="px-6 py-5 border-b border-zinc-900 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Recent Movies</CardTitle>
                     <Button variant="ghost" className="text-xs text-zinc-500 hover:text-white px-0 h-auto">View All</Button>
                 </CardHeader>
                 <CardContent className="p-3 space-y-2">
-                    {[1, 2, 3].map((i) => (
+                    {recentMovies.map((movie: any) => (
                         <div
-                            key={i}
+                            key={movie._id}
                             className="flex items-center justify-between p-3 rounded-lg hover:bg-zinc-800/50 transition-colors group"
                         >
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-14 bg-zinc-800 rounded-md overflow-hidden flex items-center justify-center">
-                                    <Film className="w-5 h-5 text-zinc-600" />
+                                <div className="w-10 h-14 bg-zinc-800 rounded-md overflow-hidden flex items-center justify-center relative">
+                                    {movie.poster ? (
+                                        <img src={movie.poster} alt={movie.title} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Film className="w-5 h-5 text-zinc-600" />
+                                    )}
                                 </div>
                                 <div>
-                                    <p className="font-semibold text-sm text-white">Interstellar Remastered</p>
-                                    <p className="text-[10px] text-zinc-500 font-medium uppercase mt-0.5 tracking-wide">Sci-Fi • 2h 49m</p>
+                                    <p className="font-semibold text-sm text-white line-clamp-1">{movie.title}</p>
+                                    <p className="text-[10px] text-zinc-500 font-medium uppercase mt-0.5 tracking-wide">{movie.description?.substring(0, 20)}...</p>
                                 </div>
                             </div>
-                            <Button size="icon" variant="ghost" className="rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/50 w-8 h-8">
+                            {/* <Button size="icon" variant="ghost" className="rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/50 w-8 h-8">
                                 <Settings className="w-4 h-4" />
-                            </Button>
+                            </Button> */}
                         </div>
                     ))}
+                    {recentMovies.length === 0 && <p className="text-zinc-500 text-center py-4 text-sm">No recent movies</p>}
                 </CardContent>
             </Card>
 
@@ -156,22 +259,25 @@ export default function AdminDashboard() {
                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Upcoming Shows</CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 space-y-2">
-                    {[1, 2, 3].map((i) => (
+                    {upcomingShows.map((show: any) => (
                         <div
-                            key={i}
+                            key={show._id}
                             className="flex items-center gap-4 p-3 rounded-lg hover:bg-zinc-800/50 cursor-pointer group"
                         >
                             <div className="w-12 h-10 rounded-lg bg-zinc-800 flex flex-col items-center justify-center border border-zinc-700/50">
-                                <span className="text-[9px] font-bold text-zinc-500 uppercase">PM</span>
-                                <span className="text-sm font-bold text-white">7:30</span>
+                                <span className="text-[9px] font-bold text-zinc-500 uppercase">
+                                    {new Date(show.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                                </span>
+                                <span className="text-sm font-bold text-white">{show.time}</span>
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-semibold text-white">Cinema {i} Screening</p>
-                                <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">Theater Hall 0{i}</p>
+                                <p className="text-sm font-semibold text-white">{show.movie?.title}</p>
+                                <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">{show.theaterId?.name}</p>
                             </div>
                             <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-white transition-all transform group-hover:translate-x-1" />
                         </div>
                     ))}
+                    {upcomingShows.length === 0 && <p className="text-zinc-500 text-center py-4 text-sm">No upcoming shows</p>}
                 </CardContent>
             </Card>
         </div>

@@ -41,7 +41,7 @@ router.post("/", isAdmin, async (req, res) => {
       return res.status(403).json({ message: "Only super admins can create global movies" });
     }
 
-    const { title, description, poster, duration, language, releaseDate } = req.body;
+    const { title, description, poster, duration, language, releaseDate, category } = req.body;
 
     const movie = await Movie.create({
       title,
@@ -49,7 +49,8 @@ router.post("/", isAdmin, async (req, res) => {
       poster,
       duration,
       language,
-      releaseDate: new Date(releaseDate)
+      releaseDate: new Date(releaseDate),
+      category
     });
 
     res.status(201).json(movie);
@@ -104,6 +105,99 @@ router.get("/:id", async (req, res) => {
     res.json(movie);
   } catch (error) {
     res.status(400).json({ message: "Invalid movie ID" });
+  }
+});
+
+/**
+ * @swagger
+ * /movies/{id}:
+ *   put:
+ *     summary: Update a movie
+ *     tags: [Movies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               poster:
+ *                 type: string
+ *               duration:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Movie updated successfully
+ *       404:
+ *         description: Movie not found
+ */
+router.put("/:id", isAdmin, async (req, res) => {
+  try {
+    if (req.dbUser.role !== "super_admin") {
+      return res.status(403).json({ message: "Only super admins can update movies" });
+    }
+
+    const { title, description, poster, duration, language, releaseDate, category } = req.body;
+
+    const movie = await Movie.findByIdAndUpdate(
+      req.params.id,
+      { title, description, poster, duration, language, releaseDate, category },
+      { new: true }
+    );
+
+    if (!movie) {
+      return res.status(404).json({ message: "Movie not found" });
+    }
+
+    res.json(movie);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /movies/{id}:
+ *   delete:
+ *     summary: Delete a movie
+ *     tags: [Movies]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Movie deleted successfully
+ *       404:
+ *         description: Movie not found
+ */
+router.delete("/:id", isAdmin, async (req, res) => {
+  try {
+    if (req.dbUser.role !== "super_admin") {
+      return res.status(403).json({ message: "Only super admins can delete movies" });
+    }
+
+    const movie = await Movie.findByIdAndDelete(req.params.id);
+
+    if (!movie) {
+      return res.status(404).json({ message: "Movie not found" });
+    }
+
+    res.json({ message: "Movie deleted successfully" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 

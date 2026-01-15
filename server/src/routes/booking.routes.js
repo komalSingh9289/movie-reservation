@@ -3,6 +3,7 @@ import Booking from "../models/booking.js";
 import Show from "../models/show.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { getAuth } from "@clerk/express";
+import User from "../models/user.js";
 
 const router = express.Router();
 
@@ -110,6 +111,68 @@ router.get("/theater", requireAuth, async (req, res) => {
 
         res.json(filteredBookings);
     } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /bookings/stats:
+ *   get:
+ *     summary: Get booking statistics (Revenue & Tickets Sold)
+ *     tags: [Bookings]
+ */
+router.get("/stats", requireAuth, async (req, res) => {
+    try {
+        const auth = getAuth(req);
+        const user = await User.findOne({ clerkId: auth.userId });
+
+        if (!user || (user.role !== "admin" && user.role !== "super_admin")) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        let matchStage = {};
+
+        // If theater admin, filter by theater
+        if (user.role === "admin") {
+            // Need to find shows for this theater first, or aggregate with lookup
+            // Since Booking -> Show -> Theater, we need a lookup
+            matchStage = {}; // We'll handle filtering in the aggregate pipeline
+        }
+
+        const pipeline = [
+            {
+                $lookup: {
+                    from: "shows",
+                    localField: "show",
+                    foreignField: "_id",
+                    as: "showDetails"
+                }
+            },
+            { $unwind: "$showDetails" }
+        ];
+
+        if (user.role === "admin") {
+            pipeline.push({
+                $match: {
+                    "showDetails.theaterId": user.theaterId
+                }
+            });
+        }
+
+        pipeline.push({
+            $group: {
+                _id: null,
+                totalRevenue: { $sum: "$totalAmount" },
+                ticketsSold: { $sum: { $size: "$seats" } }
+            }
+        });
+
+        const stats = await Booking.aggregate(pipeline);
+
+        res.json(stats[0] || { totalRevenue: 0, ticketsSold: 0 });
+    } catch (error) {
+        console.error("Error fetching booking stats:", error);
         res.status(500).json({ message: error.message });
     }
 });

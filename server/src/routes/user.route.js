@@ -55,4 +55,21 @@ router.post("/sync", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /users/stats:
+ *   get:
+ *     summary: Get user statistics
+ *     tags: [Users]
+ */
+router.get("/stats", requireAuth, async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments({ role: "user" }); // Count only regular users? Or active ones?
+    // Let's count all non-admin users for now
+    res.json({ totalUsers });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;

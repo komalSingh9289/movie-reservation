@@ -75,11 +75,21 @@ router.get("/me", requireAuth, async (req, res) => {
 
     try {
         const user = await User.findOne({ clerkId });
-        if (!user || !user.theaterId) {
+        let theaterId = user.theaterId;
+
+        // Fallback: If theaterId is missing, look up Organization by adminId
+        if (!theaterId) {
+            const org = await Organization.findOne({ adminId: user._id });
+            if (org) {
+                theaterId = org.theaterId;
+            }
+        }
+
+        if (!theaterId) {
             return res.status(404).json({ message: "Theater not found" });
         }
 
-        const theater = await Theater.findById(user.theaterId).populate("organizationId");
+        const theater = await Theater.findById(theaterId).populate("organizationId");
         res.json(theater);
     } catch (error) {
         console.error("Error fetching theater/organization details:", error);
@@ -94,7 +104,17 @@ router.put("/me", requireAuth, async (req, res) => {
 
     try {
         const user = await User.findOne({ clerkId });
-        if (!user || !user.organizationId || !user.theaterId) {
+        let { organizationId, theaterId } = user;
+
+        if (!organizationId || !theaterId) {
+            const org = await Organization.findOne({ adminId: user._id });
+            if (org) {
+                organizationId = org._id;
+                theaterId = org.theaterId;
+            }
+        }
+
+        if (!organizationId || !theaterId) {
             return res.status(404).json({ message: "Admin organization or theater not found" });
         }
 
