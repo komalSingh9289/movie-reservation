@@ -4,11 +4,17 @@ import User from "../models/user.js";
 export const requireAuth = (req, res, next) => {
     const auth = getAuth(req);
     if (!auth.userId) {
-        console.warn("Unauthenticated request blocked:", {
-            path: req.path,
-            hasToken: !!req.headers.authorization
+        console.warn("[AUTH ERROR] Unauthenticated request blocked:", {
+            path: req.baseUrl + req.path,
+            hasHeader: !!req.headers.authorization,
+            authStatus: auth.status, // log clerk auth status
+            reason: auth.reason,   // log clerk auth reason if available
+            claims: auth.claims ? "Present" : "None"
         });
-        return res.status(401).json({ message: "Unauthenticated" });
+        return res.status(401).json({
+            message: "Unauthenticated",
+            error: auth.reason || "Missing session"
+        });
     }
     next();
 };

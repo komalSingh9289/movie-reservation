@@ -26,13 +26,7 @@ console.log("CLERK_SECRET_KEY:", process.env.CLERK_SECRET_KEY ? "Present" : "Mis
 app.use(cors());
 app.use(express.json());
 
-app.use(
-  clerkMiddleware({
-    secretKey: process.env.CLERK_SECRET_KEY,
-    // Avoid passing undefined if PK is missing, let it fall back to env or SK only
-    ...(process.env.CLERK_PUBLISHABLE_KEY && { publishableKey: process.env.CLERK_PUBLISHABLE_KEY }),
-  })
-);
+app.use(clerkMiddleware());
 
 app.use("/movies", movieRoutes);
 app.use("/shows", showRoutes);

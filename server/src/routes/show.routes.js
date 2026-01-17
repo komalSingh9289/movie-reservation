@@ -125,6 +125,23 @@ router.post("/", isAdmin, async (req, res) => {
  *       200:
  *         description: List of shows
  */
+router.get("/movie/:movieId", async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const shows = await Show.find({
+      movie: req.params.movieId,
+      date: { $gte: today }
+    })
+      .populate("movie")
+      .populate("theater")
+      .sort({ date: 1, time: 1 });
+
+    res.json(shows);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 /**
  * @swagger
  * /shows/me:
