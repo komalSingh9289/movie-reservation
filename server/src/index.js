@@ -20,8 +20,8 @@ connectDB();
 
 const app = express();
 
-console.log("CLERK_PUBLISHABLE_KEY:", process.env.CLERK_PUBLISHABLE_KEY ? "Present" : "Missing");
-console.log("CLERK_SECRET_KEY:", process.env.CLERK_SECRET_KEY ? "Present" : "Missing");
+// console.log("CLERK_PUBLISHABLE_KEY:", process.env.CLERK_PUBLISHABLE_KEY ? "Present" : "Missing");
+// console.log("CLERK_SECRET_KEY:", process.env.CLERK_SECRET_KEY ? "Present" : "Missing");
 
 app.use(cors());
 app.use(express.json());

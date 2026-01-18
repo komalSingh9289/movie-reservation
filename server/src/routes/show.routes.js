@@ -1,9 +1,6 @@
 import express from "express";
-import Show from "../models/show.js";
-import { generateSeats } from "../utils/generateSeats.js";
 import { isAdmin } from "../middleware/auth.middleware.js";
-import Theater from "../models/theater.js";
-import OrganizationMovie from "../models/organizationMovie.js";
+import * as showController from "../controllers/show.controller.js";
 
 const router = express.Router();
 
@@ -13,6 +10,8 @@ const router = express.Router();
  *   post:
  *     summary: Create a show for a movie
  *     tags: [Shows]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -24,6 +23,7 @@ const router = express.Router();
  *               - date
  *               - time
  *               - price
+ *               - screenId
  *             properties:
  *               movie:
  *                 type: string
@@ -33,81 +33,15 @@ const router = express.Router();
  *                 type: string
  *               price:
  *                 type: number
+ *               theaterId:
+ *                 type: string
+ *               screenId:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Show created successfully
  */
-router.post("/", isAdmin, async (req, res) => {
-  try {
-    const { movie, date, time, price, theaterId, screenId } = req.body;
-
-    let finalTheaterId = theaterId;
-    let organizationId = req.dbUser.organizationId;
-
-    if (req.dbUser.role === "admin") {
-      finalTheaterId = req.dbUser.theaterId;
-
-      // Fallback: If user doesn't have theaterId/orgId populated, find their organization
-      if (!finalTheaterId || !organizationId) {
-        const org = await import("../models/organization.js").then(m => m.default.findOne({ adminId: req.dbUser._id }));
-        if (org) {
-          finalTheaterId = org.theaterId;
-          organizationId = org._id;
-        }
-      }
-
-      if (!finalTheaterId) {
-        return res.status(400).json({ message: "No theater associated with this admin account." });
-      }
-
-    } else if (req.dbUser.role === "super_admin") {
-      if (!theaterId) {
-        return res.status(400).json({ message: "Super Admin must provide theaterId" });
-      }
-      // For super_admin, we might need to fetch the theater to get its orgId
-      const theater = await Theater.findById(theaterId);
-      if (!theater) return res.status(404).json({ message: "Theater not found" });
-      organizationId = theater.organizationId;
-    }
-
-    if (!screenId) {
-      return res.status(400).json({ message: "screenId is required" });
-    }
-
-    // NEW: Validate if movie is in organization's collection
-    const isMovieEnabled = await OrganizationMovie.findOne({
-      organizationId,
-      movieId: movie,
-      isActive: true
-    });
-
-    if (!isMovieEnabled) {
-      return res.status(403).json({
-        message: "Movie must be added to your organization's library before scheduling shows."
-      });
-    }
-
-    // Get screen capacity for seat generation
-    const theater = await Theater.findById(finalTheaterId);
-    const screen = theater.screens.id(screenId);
-    if (!screen) return res.status(404).json({ message: "Screen not found in this theater" });
-
-    const show = await Show.create({
-      movie,
-      date,
-      time,
-      price,
-      theater: finalTheaterId,
-      screenId,
-      organization: organizationId,
-      seats: generateSeats(screen.capacity),
-    });
-
-    res.status(201).json(show);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+router.post("/", isAdmin, showController.createShow);
 
 /**
  * @swagger
@@ -125,22 +59,7 @@ router.post("/", isAdmin, async (req, res) => {
  *       200:
  *         description: List of shows
  */
-router.get("/movie/:movieId", async (req, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const shows = await Show.find({
-      movie: req.params.movieId,
-      date: { $gte: today }
-    })
-      .populate("movie")
-      .populate("theater")
-      .sort({ date: 1, time: 1 });
-
-    res.json(shows);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.get("/movie/:movieId", showController.getShowsByMovie);
 
 /**
  * @swagger
@@ -148,54 +67,66 @@ router.get("/movie/:movieId", async (req, res) => {
  *   get:
  *     summary: Get shows for current admin's theater
  *     tags: [Shows]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of shows for admin
  */
-router.get("/me", isAdmin, async (req, res) => {
-  try {
-    let theaterId = req.dbUser.theaterId;
-
-    if (!theaterId) {
-      const org = await import("../models/organization.js").then(m => m.default.findOne({ adminId: req.dbUser._id }));
-      if (org) {
-        theaterId = org.theaterId;
-      }
-    }
-
-    if (!theaterId) {
-      return res.status(404).json({ message: "Theater not found" });
-    }
-
-    // Query using 'theater' field as defined in schema
-    const query = { theater: theaterId };
-    const shows = await Show.find(query)
-      .populate("movie")
-      .sort({ date: 1, time: 1 });
-
-    res.json(shows);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.get("/me", isAdmin, showController.getAdminShows);
 
 /**
  * @swagger
  * /shows/upcoming:
  *   get:
- *     summary: Get upcoming shows sorted by date and time
+ *     summary: Get upcoming shows
  *     tags: [Shows]
+ *     responses:
+ *       200:
+ *         description: List of upcoming shows
  */
-router.get("/upcoming", async (req, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const shows = await Show.find({ date: { $gte: today } })
-      .populate("movie")
-      .populate("theater") // Populate theater to show name
-      .sort({ date: 1, time: 1 })
-      .limit(5);
+router.get("/upcoming", showController.getUpcomingShows);
 
-    res.json(shows);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+/**
+ * @swagger
+ * /shows/{id}:
+ *   get:
+ *     summary: Get show by ID
+ *     tags: [Shows]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Show found
+ *       404:
+ *         description: Show not found
+ */
+router.get("/:id", showController.getShowById);
+
+/**
+ * @swagger
+ * /shows/{id}:
+ *   delete:
+ *     summary: Delete a show
+ *     tags: [Shows]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Show deleted successfully
+ *       404:
+ *         description: Show not found
+ */
+router.delete("/:id", isAdmin, showController.deleteShow);
 
 export default router;

@@ -4,6 +4,11 @@ const screenSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     capacity: { type: Number, required: true },
+    layoutId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SeatLayout",
+      required: true,
+    }
   },
   { _id: true } // important
 );

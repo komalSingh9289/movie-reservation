@@ -1,59 +1,52 @@
 import express from "express";
-import OrganizationMovie from "../models/organizationMovie.js";
 import { isAdmin, requireAuth } from "../middleware/auth.middleware.js";
-import User from "../models/user.js";
+import * as organizationMovieController from "../controllers/organizationMovie.controller.js";
 
 const router = express.Router();
 
-// Add movie to organization collection
-router.post("/", isAdmin, async (req, res) => {
-    try {
-        const { movieId } = req.body;
-        const organizationId = req.dbUser.organizationId;
+/**
+ * @swagger
+ * /organization-movies:
+ *   post:
+ *     summary: Add movie to organization collection
+ *     tags: [OrganizationMovies]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - movieId
+ *             properties:
+ *               movieId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Movie added successfully
+ */
+router.post("/", isAdmin, organizationMovieController.addMovieToOrganization);
 
-        if (!organizationId) {
-            return res.status(400).json({ message: "User is not associated with an organization" });
-        }
-
-        const orgMovie = await OrganizationMovie.create({
-            organizationId,
-            movieId,
-        });
-
-        res.status(201).json(orgMovie);
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ message: "Movie already in organization collection" });
-        }
-        res.status(500).json({ message: error.message });
-    }
-});
-
-// Get organization movie collection
-router.get("/", requireAuth, async (req, res) => {
-    try {
-        const clerkId = req.auth.userId;
-        const user = await User.findOne({ clerkId });
-
-        if (!user || (!user.organizationId && user.role !== 'super_admin')) {
-            return res.status(400).json({ message: "Invalid organization state" });
-        }
-
-        let query = {};
-        if (user.role === 'admin') {
-            query.organizationId = user.organizationId;
-        } else if (user.role === 'super_admin' && req.query.organizationId) {
-            query.organizationId = req.query.organizationId;
-        }
-
-        const movies = await OrganizationMovie.find(query)
-            .populate("movieId")
-            .sort({ createdAt: -1 });
-
-        res.json(movies);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-});
+/**
+ * @swagger
+ * /organization-movies:
+ *   get:
+ *     summary: Get organization movie collection
+ *     tags: [OrganizationMovies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: organizationId
+ *         schema:
+ *           type: string
+ *         description: Organization ID (for Super Admin)
+ *     responses:
+ *       200:
+ *         description: List of movies in organization collection
+ */
+router.get("/", requireAuth, organizationMovieController.getOrganizationMovies);
 
 export default router;

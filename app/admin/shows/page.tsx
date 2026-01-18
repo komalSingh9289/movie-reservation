@@ -96,6 +96,35 @@ export default function ShowsPage() {
     }
   };
 
+  const handleDelete = async (showId: string) => {
+    if (!statusConfirm(`Are you sure you want to delete this show? This action cannot be undone.`)) return;
+    
+    try {
+      const token = await getToken();
+      const response = await fetch(`http://localhost:5000/shows/${showId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        fetchData();
+      } else {
+        const error = await response.json();
+        alert(error.message || "Failed to delete show");
+      }
+    } catch (error) {
+      console.error("Deletion error:", error);
+      alert("An error occurred while deleting the show.");
+    }
+  };
+
+  // Helper because confirm is not defined in some SSR environments (though this is 'use client')
+  function statusConfirm(msg: string) {
+    return window.confirm(msg);
+  }
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -212,7 +241,12 @@ export default function ShowsPage() {
                                     <Ticket className="w-4 h-4 text-blue-400" />
                                     <span className="text-xs font-bold text-zinc-400">{show.seats.filter((s:any) => s.status === 'booked').length} / {show.seats.length} booked</span>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl">
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => handleDelete(show._id)}
+                                    className="h-9 w-9 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl"
+                                >
                                     <Trash2 className="w-4 h-4" />
                                 </Button>
                             </div>

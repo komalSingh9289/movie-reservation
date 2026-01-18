@@ -2,14 +2,19 @@ import mongoose from "mongoose";
 
 const seatSchema = new mongoose.Schema(
   {
-    seatNumber: {
+    seatId: {
       type: String,
       required: true,
     },
     status: {
       type: String,
-      enum: ["available", "locked", "booked"],
-      default: "available",
+      enum: ["AVAILABLE", "LOCKED", "BOOKED"],
+      default: "AVAILABLE",
+    },
+    type: {
+      type: String,
+      enum: ["PLATINUM", "GOLD", "SILVER"],
+      default: "SILVER",
     },
     lockedBy: {
       type: String, // userId or socketId

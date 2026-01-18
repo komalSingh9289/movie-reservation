@@ -1,10 +1,39 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { movies } from "@/data/movies";
-import { Play, Calendar, Star, MoveRight } from "lucide-react";
+import { movies as staticMovies } from "@/data/movies";
+import { Play, Calendar, Star, MoveRight, Loader2 } from "lucide-react";
+import axios from "axios";
+
+interface Movie {
+  _id: string;
+  title: string;
+  poster: string;
+  category?: { name: string };
+  duration: string;
+  rating?: number;
+  trailerId?: string;
+}
 
 export default function Home() {
-  const displayedMovies = movies.slice(0, 4);
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMovies = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/movies");
+        setMovies(res.data.slice(0, 4));
+      } catch (error) {
+        console.error("Error fetching trending movies:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMovies();
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-black text-white">
@@ -65,40 +94,46 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {displayedMovies.map((movie) => (
-            <div key={movie.id} className="group relative flex flex-col bg-zinc-900/50 rounded-xl overflow-hidden border border-zinc-800 hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-1.5">
-              <div className="overflow-hidden relative">
-                <img 
-                  src={movie.poster} 
-                  alt={movie.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold flex items-center gap-1">
-                  <Star className="h-2.5 w-2.5 text-yellow-400 fill-yellow-400" />
-                  {movie.rating || "8.5"}
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="h-10 w-10 text-purple-500 animate-spin" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {movies.map((movie) => (
+              <div key={movie._id} className="group relative flex flex-col bg-zinc-900/50 rounded-xl overflow-hidden border border-zinc-800 hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-1.5">
+                <div className="overflow-hidden relative aspect-[2/3]">
+                  <img 
+                    src={movie.poster} 
+                    alt={movie.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold flex items-center gap-1">
+                    <Star className="h-2.5 w-2.5 text-yellow-400 fill-yellow-400" />
+                    {movie.rating || "8.5"}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">{movie.category || "Sci-Fi"}</span>
-                  <span className="text-[10px] text-zinc-500 flex items-center gap-1">
-                    <Calendar className="h-2.5 w-2.5" />
-                    {movie.duration}
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold group-hover:text-purple-400 transition-colors line-clamp-1">{movie.title}</h3>
                 
-                <Link href={`/movies/${movie.id}`} className="block pt-1">
-                  <Button variant="outline" size="sm" className="w-full h-8 text-xs bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors">
-                    Book Now
-                  </Button>
-                </Link>
+                <div className="p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">{movie.category?.name || "Action"}</span>
+                    <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                      <Calendar className="h-2.5 w-2.5" />
+                      {movie.duration}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold group-hover:text-purple-400 transition-colors line-clamp-1">{movie.title}</h3>
+                  
+                  <Link href={`/movies/${movie._id}`} className="block pt-1">
+                    <Button variant="outline" size="sm" className="w-full h-8 text-xs bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors">
+                      Book Now
+                    </Button>
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Watch Trailer Section - Collage Layout */}
@@ -114,14 +149,14 @@ export default function Home() {
             {/* Primary Trailer (Large) */}
             <div className="md:col-span-7 relative group cursor-pointer overflow-hidden rounded-3xl border border-white/5 shadow-2xl">
               <img 
-                src={`https://img.youtube.com/vi/${movies[0].trailerId}/maxresdefault.jpg`} 
-                alt={movies[0].title}
+                src={`https://img.youtube.com/vi/${staticMovies[0]?.trailerId}/maxresdefault.jpg`} 
+                alt={staticMovies[0]?.title}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
               <div className="absolute inset-0 flex items-center justify-center translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
                 <a 
-                  href={`https://www.youtube.com/watch?v=${movies[0].trailerId}`} 
+                  href={`https://www.youtube.com/watch?v=${staticMovies[0]?.trailerId}`} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="h-20 w-20 rounded-full bg-white text-black flex items-center justify-center hover:bg-purple-600 hover:text-white transition-colors shadow-xl"
@@ -131,7 +166,7 @@ export default function Home() {
               </div>
               <div className="absolute bottom-8 left-8 space-y-2">
                 <span className="px-3 py-1 rounded-full bg-purple-600 text-xs font-bold uppercase tracking-widest text-white">Trending Now</span>
-                <h3 className="text-3xl md:text-4xl font-black text-white">{movies[0].title} Official Trailer</h3>
+                <h3 className="text-3xl md:text-4xl font-black text-white">{staticMovies[0]?.title} Official Trailer</h3>
               </div>
             </div>
 
@@ -140,14 +175,14 @@ export default function Home() {
               {/* Secondary Trailer 1 */}
               <div className="relative group cursor-pointer overflow-hidden rounded-3xl border border-white/5 shadow-xl">
                 <img 
-                  src={`https://img.youtube.com/vi/${movies[1].trailerId}/maxresdefault.jpg`} 
-                  alt={movies[1].title}
+                  src={`https://img.youtube.com/vi/${staticMovies[1]?.trailerId}/maxresdefault.jpg`} 
+                  alt={staticMovies[1]?.title}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                   <a 
-                    href={`https://www.youtube.com/watch?v=${movies[1].trailerId}`} 
+                    href={`https://www.youtube.com/watch?v=${staticMovies[1]?.trailerId}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="h-16 w-16 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30 flex items-center justify-center hover:bg-purple-600 transition-colors"
@@ -156,7 +191,7 @@ export default function Home() {
                   </a>
                 </div>
                 <div className="absolute bottom-6 left-6">
-                  <h4 className="text-xl font-bold text-white">{movies[1].title}</h4>
+                  <h4 className="text-xl font-bold text-white">{staticMovies[1]?.title}</h4>
                   <p className="text-sm text-zinc-300">New Release • Watch Trailer</p>
                 </div>
               </div>
@@ -164,14 +199,14 @@ export default function Home() {
               {/* Secondary Trailer 2 */}
               <div className="relative group cursor-pointer overflow-hidden rounded-3xl border border-white/5 shadow-xl">
                 <img 
-                  src={`https://img.youtube.com/vi/${movies[2].trailerId}/maxresdefault.jpg`} 
-                  alt={movies[2].title}
+                  src={`https://img.youtube.com/vi/${staticMovies[2]?.trailerId}/maxresdefault.jpg`} 
+                  alt={staticMovies[2]?.title}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                   <a 
-                    href={`https://www.youtube.com/watch?v=${movies[2].trailerId}`} 
+                    href={`https://www.youtube.com/watch?v=${staticMovies[2]?.trailerId}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="h-16 w-16 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30 flex items-center justify-center hover:bg-purple-600 transition-colors"
@@ -180,7 +215,7 @@ export default function Home() {
                   </a>
                 </div>
                 <div className="absolute bottom-6 left-6">
-                  <h4 className="text-xl font-bold text-white">{movies[2].title}</h4>
+                  <h4 className="text-xl font-bold text-white">{staticMovies[2]?.title}</h4>
                   <p className="text-sm text-zinc-300">Exclusive Look • Watch Trailer</p>
                 </div>
               </div>

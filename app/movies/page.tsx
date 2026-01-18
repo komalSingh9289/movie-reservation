@@ -40,7 +40,7 @@ export default function MoviesPage() {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         const [moviesRes, categoriesRes, favoritesRes] = await Promise.all([
-          axios.get("http://localhost:5000/movies"),
+          axios.get("http://localhost:5000/movies?showingOnly=true"),
           axios.get("http://localhost:5000/categories"),
           isSignedIn 
             ? axios.get("http://localhost:5000/users/favorites", { headers }).catch(() => ({ data: [] }))
@@ -142,7 +142,7 @@ export default function MoviesPage() {
         ) : filteredMovies.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
             {filteredMovies.map((movie) => (
-              <div key={movie._id} className="group relative flex flex-col bg-zinc-900/30 rounded-xl overflow-hidden border border-zinc-800/50 hover:border-purple-500/40 transition-all duration-300 hover:-translate-y-2">
+              <div key={movie._id} className="group relative flex flex-col bg-zinc-900/50 rounded-xl overflow-hidden border border-zinc-800 hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-1.5">
                 <div className="overflow-hidden relative aspect-[2/3]">
                   <img 
                     src={movie.poster} 
@@ -151,32 +151,29 @@ export default function MoviesPage() {
                   />
                   <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold flex items-center gap-1">
                     <Star className="h-2.5 w-2.5 text-yellow-400 fill-yellow-400" />
-                    {movie.rating || "N/A"}
+                    {movie.rating || "8.5"}
                   </div>
                   <button 
                     onClick={() => toggleFavorite(movie._id)}
                     disabled={togglingFavorite === movie._id}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60 transition-colors"
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60 transition-colors z-10"
                   >
                     <Heart className={cn("h-3.5 w-3.5", favorites.includes(movie._id) ? "fill-red-500 text-red-500" : "text-white")} />
                   </button>
                 </div>
                 
-                <div className="p-4 space-y-2 flex-1 flex flex-col">
-                  <div className="items-center justify-between flex">
-                    <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">{movie.category?.name || "General"}</span>
+                <div className="p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">{movie.category?.name || "Action"}</span>
                     <span className="text-[10px] text-zinc-500 flex items-center gap-1">
                       <Calendar className="h-2.5 w-2.5" />
                       {movie.duration}
                     </span>
                   </div>
                   <h3 className="text-sm font-bold group-hover:text-purple-400 transition-colors line-clamp-1">{movie.title}</h3>
-                  <p className="text-zinc-500 text-[11px] line-clamp-2 leading-relaxed flex-grow">
-                    {movie.description}
-                  </p>
                   
-                  <Link href={`/movies/${movie._id}`} className="block pt-2 mt-auto">
-                    <Button variant="secondary" size="sm" className="w-full h-9 text-xs bg-zinc-800/50 hover:bg-purple-600 hover:text-white border border-zinc-700/50 transition-all duration-300">
+                  <Link href={`/movies/${movie._id}`} className="block pt-1">
+                    <Button variant="outline" size="sm" className="w-full h-8 text-xs bg-zinc-800 hover:bg-purple-600 hover:text-white transition-colors">
                       Book Now
                     </Button>
                   </Link>

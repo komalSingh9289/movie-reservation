@@ -1,6 +1,6 @@
 import express from "express";
-import Movie from "../models/movies.js";
 import { isAdmin } from "../middleware/auth.middleware.js";
+import * as movieController from "../controllers/movie.controller.js";
 
 const router = express.Router();
 
@@ -8,8 +8,10 @@ const router = express.Router();
  * @swagger
  * /movies:
  *   post:
- *     summary: Create a new movie
+ *     summary: Create a new movie (Super Admin only)
  *     tags: [Movies]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -30,34 +32,20 @@ const router = express.Router();
  *                 type: string
  *               duration:
  *                 type: string
+ *               language:
+ *                 type: string
+ *               releaseDate:
+ *                 type: string
+ *                 format: date
+ *               category:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Movie created successfully
+ *       403:
+ *         description: Unauthorized
  */
-router.post("/", isAdmin, async (req, res) => {
-  try {
-    // Only super_admin can create global movies
-    if (req.dbUser.role !== "super_admin") {
-      return res.status(403).json({ message: "Only super admins can create global movies" });
-    }
-
-    const { title, description, poster, duration, language, releaseDate, category } = req.body;
-
-    const movie = await Movie.create({
-      title,
-      description,
-      poster,
-      duration,
-      language,
-      releaseDate: new Date(releaseDate),
-      category
-    });
-
-    res.status(201).json(movie);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+router.post("/", isAdmin, movieController.createMovie);
 
 /**
  * @swagger
@@ -65,18 +53,17 @@ router.post("/", isAdmin, async (req, res) => {
  *   get:
  *     summary: Get all movies
  *     tags: [Movies]
+ *     parameters:
+ *       - in: query
+ *         name: showingOnly
+ *         schema:
+ *           type: boolean
+ *         description: Filter movies that have active shows
  *     responses:
  *       200:
  *         description: List of movies
  */
-router.get("/", async (req, res) => {
-  try {
-    const movies = await Movie.find({ isActive: true }).populate("category").sort({ createdAt: -1 });
-    res.json(movies);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.get("/", movieController.getMovies);
 
 /**
  * @swagger
@@ -96,24 +83,16 @@ router.get("/", async (req, res) => {
  *       404:
  *         description: Movie not found
  */
-router.get("/:id", async (req, res) => {
-  try {
-    const movie = await Movie.findById(req.params.id).populate("category");
-    if (!movie) {
-      return res.status(404).json({ message: "Movie not found" });
-    }
-    res.json(movie);
-  } catch (error) {
-    res.status(400).json({ message: "Invalid movie ID" });
-  }
-});
+router.get("/:id", movieController.getMovieById);
 
 /**
  * @swagger
  * /movies/{id}:
  *   put:
- *     summary: Update a movie
+ *     summary: Update a movie (Super Admin only)
  *     tags: [Movies]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -141,36 +120,16 @@ router.get("/:id", async (req, res) => {
  *       404:
  *         description: Movie not found
  */
-router.put("/:id", isAdmin, async (req, res) => {
-  try {
-    if (req.dbUser.role !== "super_admin") {
-      return res.status(403).json({ message: "Only super admins can update movies" });
-    }
-
-    const { title, description, poster, duration, language, releaseDate, category } = req.body;
-
-    const movie = await Movie.findByIdAndUpdate(
-      req.params.id,
-      { title, description, poster, duration, language, releaseDate, category },
-      { new: true }
-    );
-
-    if (!movie) {
-      return res.status(404).json({ message: "Movie not found" });
-    }
-
-    res.json(movie);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+router.put("/:id", isAdmin, movieController.updateMovie);
 
 /**
  * @swagger
  * /movies/{id}:
  *   delete:
- *     summary: Delete a movie
+ *     summary: Delete a movie (Super Admin only)
  *     tags: [Movies]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -183,22 +142,7 @@ router.put("/:id", isAdmin, async (req, res) => {
  *       404:
  *         description: Movie not found
  */
-router.delete("/:id", isAdmin, async (req, res) => {
-  try {
-    if (req.dbUser.role !== "super_admin") {
-      return res.status(403).json({ message: "Only super admins can delete movies" });
-    }
-
-    const movie = await Movie.findByIdAndDelete(req.params.id);
-
-    if (!movie) {
-      return res.status(404).json({ message: "Movie not found" });
-    }
-
-    res.json({ message: "Movie deleted successfully" });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+router.delete("/:id", isAdmin, movieController.deleteMovie);
 
 export default router;
+

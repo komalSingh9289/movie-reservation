@@ -1,7 +1,6 @@
 import express from "express";
-import { getAuth } from "@clerk/express";
-import User from "../models/user.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import * as userController from "../controllers/user.controller.js";
 
 const router = express.Router();
 
@@ -11,50 +10,28 @@ const router = express.Router();
  *   post:
  *     summary: Sync Clerk user with DB
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               clerkId:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User synced successfully
  */
-router.post("/sync", requireAuth, async (req, res) => {
-  const { clerkId, name, email, avatar } = req.body;
-  console.log("Sync requested for:", { clerkId, email });
-
-  try {
-    // 1. Check if super_admin exists
-    const superAdminExists = await User.findOne({ role: "super_admin" });
-
-    // 2. Atomic Upsert (Avoid ConflictingUpdateOperators by separating fields)
-    const setQuery = {};
-    const setOnInsertQuery = {
-      role: superAdminExists ? "user" : "super_admin"
-    };
-
-    if (name) {
-      setQuery.name = name;
-    } else {
-      setOnInsertQuery.name = "Anonymous";
-    }
-
-    if (email) setQuery.email = email;
-    if (avatar) setQuery.avatar = avatar;
-
-    const user = await User.findOneAndUpdate(
-      { clerkId },
-      {
-        $set: setQuery,
-        $setOnInsert: setOnInsertQuery
-      },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true
-      }
-    );
-
-    console.log(`Sync complete for: ${clerkId}. Role: ${user.role}`);
-    res.json(user);
-  } catch (error) {
-    console.error("DETAILED Error syncing user:", error);
-    res.status(500).json({ message: "Error syncing user", error: error.message });
-  }
-});
+router.post("/sync", requireAuth, userController.syncUser);
 
 /**
  * @swagger
@@ -62,28 +39,19 @@ router.post("/sync", requireAuth, async (req, res) => {
  *   post:
  *     summary: Toggle movie in user's favorites
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: movieId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Favorite toggled successfully
  */
-router.post("/favorites/:movieId", requireAuth, async (req, res) => {
-  try {
-    const auth = getAuth(req);
-    const user = await User.findOne({ clerkId: auth.userId });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const movieId = req.params.movieId;
-    const isFavorite = user.favorites.includes(movieId);
-
-    if (isFavorite) {
-      user.favorites = user.favorites.filter(id => id.toString() !== movieId);
-    } else {
-      user.favorites.push(movieId);
-    }
-
-    await user.save();
-    res.json({ message: isFavorite ? "Removed from favorites" : "Added to favorites", favorites: user.favorites });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.post("/favorites/:movieId", requireAuth, userController.toggleFavorite);
 
 /**
  * @swagger
@@ -91,33 +59,24 @@ router.post("/favorites/:movieId", requireAuth, async (req, res) => {
  *   get:
  *     summary: Get user's favorite movies
  *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of favorite movies
  */
-router.get("/favorites", requireAuth, async (req, res) => {
-  try {
-    const auth = getAuth(req);
-    const user = await User.findOne({ clerkId: auth.userId }).populate("favorites");
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user.favorites);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.get("/favorites", requireAuth, userController.getFavorites);
 
 /**
  * @swagger
  * /users/stats:
  *   get:
- *     summary: Get user statistics
+ *     summary: Get user statistics (Total users count)
  *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: User statistics
  */
-router.get("/stats", requireAuth, async (req, res) => {
-  try {
-    const totalUsers = await User.countDocuments({ role: "user" }); // Count only regular users? Or active ones?
-    // Let's count all non-admin users for now
-    res.json({ totalUsers });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.get("/stats", requireAuth, userController.getUserStats);
 
 export default router;
