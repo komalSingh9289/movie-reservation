@@ -27,6 +27,12 @@ export const registerTheater = async (req, res) => {
         //adding layout 
         const defaultLayout = await seatLayout.findOne({ name: "STANDARD_100" });
 
+        if (!defaultLayout) {
+            return res.status(500).json({
+                message: "Default seat layout not found. Please run 'node seed_seat_layout.js' to initialize seat layouts."
+            });
+        }
+
         const screensWithLayout = req.body.screens.map(screen => ({
             ...screen,
             layoutId: defaultLayout._id

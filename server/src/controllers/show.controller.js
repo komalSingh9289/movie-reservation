@@ -62,6 +62,8 @@ export const createShow = async (req, res) => {
                 message: "Movie must be added to your organization's library before scheduling shows."
             });
         }
+        // console.log("Seat types map:", layout.seatTypes);
+        // console.log("Row A type:", layout.seatTypes.get("A"));
 
         const show = await Show.create({
             movie,

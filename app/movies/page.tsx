@@ -46,6 +46,9 @@ export default function MoviesPage() {
             ? axios.get("http://localhost:5000/users/favorites", { headers }).catch(() => ({ data: [] }))
             : Promise.resolve({ data: [] })
         ]);
+        // console.log("Movies:", moviesRes.data);
+        // console.log("Categories:", categoriesRes.data);
+        // console.log("Favorites:", favoritesRes.data);
 
         setMovies(moviesRes.data);
         setFavorites(favoritesRes.data.map((f: any) => f._id));
