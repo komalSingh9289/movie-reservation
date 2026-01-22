@@ -4,6 +4,7 @@ import User from "../models/user.js";
 import { getAuth } from "@clerk/express";
 import { Cashfree, CFEnvironment } from "cashfree-pg";
 import crypto from "crypto";
+import { getIO } from "../config/socket.js";
 
 // Cashfree Configuration
 let cashfreeInstance;
@@ -146,6 +147,14 @@ export const verifyPayment = async (req, res) => {
                     new: true
                 }
             );
+
+            const bookedSeats = booking.seats.map(seatId => ({
+                seatId,
+                status: "BOOKED",
+                lockedBy: null
+            }));
+
+            getIO().to(booking.show._id.toString()).emit("seats-updated", bookedSeats);
 
             return res.json({ status: "success", booking });
         } else if (["CANCELLED", "EXPIRED"].includes(orderData.order_status)) {

@@ -1,11 +1,14 @@
 import dotenv from "dotenv";
 dotenv.config();
+import { Server } from "socket.io";
+import http from "http";
 
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./config/db.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.js";
+
 import movieRoutes from "./routes/movie.routes.js";
 import showRoutes from "./routes/show.routes.js";
 import userRoutes from "./routes/user.route.js";
@@ -14,9 +17,13 @@ import theaterRoutes from "./routes/theater.route.js";
 import organizationMovieRoutes from "./routes/organizationMovie.route.js";
 import categoryRoutes from "./routes/category.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+
+
 import { clerkMiddleware } from "@clerk/express";
 import cron from "node-cron";
 import { unlockExpiredSeats } from "./utils/unlockExpiredSeats.js";
+
+
 
 // Run every minute
 cron.schedule("* * * * *", async () => {
@@ -47,9 +54,14 @@ app.use("/admin", adminRoutes);
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// ------------------ HTTP + SOCKET ------------------
+const server = http.createServer(app);
+import { initSocket } from "./config/socket.js";
+initSocket(server);
+
 
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

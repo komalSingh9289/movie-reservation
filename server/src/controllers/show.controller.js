@@ -5,6 +5,7 @@ import OrganizationMovie from "../models/organizationMovie.js";
 import Organization from "../models/organization.js";
 import SeatLayout from "../models/seatLayout.js";
 import { getAuth } from "@clerk/express";
+import { getIO } from "../config/socket.js";
 
 export const createShow = async (req, res) => {
     try {
@@ -196,7 +197,7 @@ export const deleteShow = async (req, res) => {
 
 export const lockSeats = async (req, res) => {
     try {
-        const { seats } = req.body; // Array of seatIds
+        const { seats } = req.body;
         const { id: showId } = req.params;
         const auth = getAuth(req);
         const userId = auth.userId;
@@ -211,26 +212,31 @@ export const lockSeats = async (req, res) => {
             return res.status(400).json({ message: "Show has already started" });
         }
 
-        const lockExpiryTime = 5 * 60 * 1000; // 5 minutes
+        const lockExpiryTime = 5 * 60 * 1000;
 
-        // Verify all requested seats are available or have expired locks
+        // 🔍 Validate seats
         for (const seatId of seats) {
             const seat = show.seats.find(s => s.seatId === seatId);
-            if (!seat) return res.status(400).json({ message: `Seat ${seatId} not found` });
+
+            if (!seat) {
+                return res.status(400).json({ message: `Seat ${seatId} not found` });
+            }
 
             if (seat.status === "BOOKED") {
                 return res.status(400).json({ message: `Seat ${seatId} is already booked` });
             }
 
             if (seat.status === "LOCKED") {
-                const isExpired = (now - new Date(seat.lockedAt)) > lockExpiryTime;
+                const isExpired = now - new Date(seat.lockedAt) > lockExpiryTime;
                 if (!isExpired && seat.lockedBy !== userId) {
-                    return res.status(400).json({ message: `Seat ${seatId} is currently locked by another user` });
+                    return res.status(400).json({
+                        message: `Seat ${seatId} is locked by another user`
+                    });
                 }
             }
         }
 
-        // Atomic lock update
+        // 🔒 Atomic lock
         const updatedShow = await Show.findOneAndUpdate(
             { _id: showId },
             {
@@ -246,11 +252,27 @@ export const lockSeats = async (req, res) => {
             }
         );
 
-        res.json({ message: "Seats locked successfully", show: updatedShow });
+
+
+
+        // 📡 Emit real-time update
+        const lockedSeats = seats.map(seatId => ({
+            seatId,
+            status: "LOCKED",
+            lockedBy: userId
+        }));
+
+        getIO().to(showId).emit("seats-updated", lockedSeats);
+
+        res.json({
+            message: "Seats locked successfully",
+            show: updatedShow
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
+
 
 export const unlockSeats = async (req, res) => {
     try {
@@ -259,7 +281,6 @@ export const unlockSeats = async (req, res) => {
         const auth = getAuth(req);
         const userId = auth.userId;
 
-        // Atomic unlock update (only if locked by the same user)
         const updatedShow = await Show.findOneAndUpdate(
             { _id: showId },
             {
@@ -280,10 +301,25 @@ export const unlockSeats = async (req, res) => {
             }
         );
 
-        if (!updatedShow) return res.status(404).json({ message: "Show not found" });
+        if (!updatedShow) {
+            return res.status(404).json({ message: "Show not found" });
+        }
 
-        res.json({ message: "Seats unlocked successfully", show: updatedShow });
+        // 📡 Emit real-time unlock
+        const unlockedSeats = seats.map(seatId => ({
+            seatId,
+            status: "AVAILABLE",
+            lockedBy: null
+        }));
+
+        getIO().to(showId).emit("seats-updated", unlockedSeats);
+
+        res.json({
+            message: "Seats unlocked successfully",
+            show: updatedShow
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 };
+

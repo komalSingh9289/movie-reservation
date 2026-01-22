@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { cn } from "@/lib/utils";
+import { socket } from "@/lib/socket";
 
 interface Movie {
   _id: string;
@@ -71,6 +72,8 @@ export default function TheaterSelectionPage() {
 
     if (id) fetchData();
   }, [id]);
+
+
 
   /** DATE PILLS */
   const dates = Array.from(new Set(shows.map((s) => s.date))).sort();

@@ -102,7 +102,7 @@ export default function Home() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {movies.map((movie) => (
               <div key={movie._id} className="group relative flex flex-col bg-zinc-900/50 rounded-xl overflow-hidden border border-zinc-800 hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-1.5">
-                <div className="overflow-hidden relative aspect-[2/3]">
+                <div className="overflow-hidden relative aspect-[1/1]">
                   <img 
                     src={movie.poster} 
                     alt={movie.title}

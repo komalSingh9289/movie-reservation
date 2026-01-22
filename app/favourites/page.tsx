@@ -171,14 +171,14 @@ export default function FavouritesPage() {
         ) : (
           <div className="py-32 flex flex-col items-center justify-center text-center space-y-6 bg-zinc-900/20 rounded-[3rem] border border-zinc-900/50">
             <div className="w-24 h-24 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 mb-2">
-               <Heart className="w-10 h-10 text-zinc-700" />
+               <Heart className="w-10 h-10 text-red-500" />
             </div>
             <div className="space-y-2">
               <h2 className="text-2xl font-bold">Your watchlist is empty</h2>
               <p className="text-zinc-500 max-w-sm">Movies you heart on the exploration page will appear here for quick access.</p>
             </div>
             <Link href="/movies">
-               <Button variant="outline" className="border-zinc-800 hover:bg-zinc-900 px-8 rounded-full h-12">Start Exploring</Button>
+               <Button variant="default" className="bg-purple-600 hover:bg-purple-500 px-8 rounded-full h-12">Start Exploring</Button>
             </Link>
           </div>
         )}
