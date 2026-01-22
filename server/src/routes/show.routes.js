@@ -129,4 +129,70 @@ router.get("/:id", showController.getShowById);
  */
 router.delete("/:id", isAdmin, showController.deleteShow);
 
+/**
+ * @swagger
+ * /shows/{id}/lock-seats:
+ *   patch:
+ *     summary: Lock seats for a show
+ *     tags: [Shows]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - seats
+ *             properties:
+ *               seats:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Seats locked successfully
+ */
+router.patch("/:id/lock-seats", showController.lockSeats);
+
+/**
+ * @swagger
+ * /shows/{id}/unlock-seats:
+ *   patch:
+ *     summary: Unlock seats for a show
+ *     tags: [Shows]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - seats
+ *             properties:
+ *               seats:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Seats unlocked successfully
+ */
+router.patch("/:id/unlock-seats", showController.unlockSeats);
+
 export default router;

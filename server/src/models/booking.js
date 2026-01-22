@@ -21,10 +21,23 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    orderId: {
+      type: String,
+      unique: true,
+    },
+    cfOrderId: {
+      type: String,
+    },
     status: {
       type: String,
-      enum: ["confirmed", "cancelled"],
-      default: "confirmed",
+      enum: ["pending", "confirmed", "failed", "cancelled"],
+      default: "pending",
+    },
+    paymentStatus: {
+      type: String, // Cashfree specific status (PAID, ACTIVE, etc)
+    },
+    paymentMessage: {
+      type: String,
     },
   },
   { timestamps: true }

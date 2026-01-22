@@ -4,6 +4,7 @@ import Theater from "../models/theater.js";
 import OrganizationMovie from "../models/organizationMovie.js";
 import Organization from "../models/organization.js";
 import SeatLayout from "../models/seatLayout.js";
+import { getAuth } from "@clerk/express";
 
 export const createShow = async (req, res) => {
     try {
@@ -85,14 +86,22 @@ export const createShow = async (req, res) => {
 
 export const getShowsByMovie = async (req, res) => {
     try {
+        const now = new Date();
         const shows = await Show.find({
-            movie: req.params.movieId
+            movie: req.params.movieId,
+            date: { $gte: now.toISOString().split('T')[0] }
         })
             .populate("movie")
             .populate("theater")
             .sort({ date: 1, time: 1 });
 
-        res.json(shows);
+        // Filter out shows that started today but in the past
+        const filteredShows = shows.filter(show => {
+            const showStartTime = new Date(`${show.date}T${show.time}:00`);
+            return showStartTime > now;
+        });
+
+        res.json(filteredShows);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -140,13 +149,22 @@ export const getAdminShows = async (req, res) => {
 
 export const getUpcomingShows = async (req, res) => {
     try {
-        const shows = await Show.find()
+        const now = new Date();
+        const shows = await Show.find({
+            date: { $gte: now.toISOString().split('T')[0] }
+        })
             .populate("movie")
             .populate("theater")
             .sort({ date: 1, time: 1 })
             .limit(5);
 
-        res.json(shows);
+        // Filter out shows that started today but in the past
+        const filteredShows = shows.filter(show => {
+            const showStartTime = new Date(`${show.date}T${show.time}:00`);
+            return showStartTime > now;
+        });
+
+        res.json(filteredShows);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -171,6 +189,100 @@ export const deleteShow = async (req, res) => {
             return res.status(404).json({ message: "Show not found or unauthorized" });
         }
         res.json(show);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const lockSeats = async (req, res) => {
+    try {
+        const { seats } = req.body; // Array of seatIds
+        const { id: showId } = req.params;
+        const auth = getAuth(req);
+        const userId = auth.userId;
+
+        const show = await Show.findById(showId);
+        if (!show) return res.status(404).json({ message: "Show not found" });
+
+        const now = new Date();
+        const showStartTime = new Date(`${show.date}T${show.time}:00`);
+
+        if (now > showStartTime) {
+            return res.status(400).json({ message: "Show has already started" });
+        }
+
+        const lockExpiryTime = 5 * 60 * 1000; // 5 minutes
+
+        // Verify all requested seats are available or have expired locks
+        for (const seatId of seats) {
+            const seat = show.seats.find(s => s.seatId === seatId);
+            if (!seat) return res.status(400).json({ message: `Seat ${seatId} not found` });
+
+            if (seat.status === "BOOKED") {
+                return res.status(400).json({ message: `Seat ${seatId} is already booked` });
+            }
+
+            if (seat.status === "LOCKED") {
+                const isExpired = (now - new Date(seat.lockedAt)) > lockExpiryTime;
+                if (!isExpired && seat.lockedBy !== userId) {
+                    return res.status(400).json({ message: `Seat ${seatId} is currently locked by another user` });
+                }
+            }
+        }
+
+        // Atomic lock update
+        const updatedShow = await Show.findOneAndUpdate(
+            { _id: showId },
+            {
+                $set: {
+                    "seats.$[elem].status": "LOCKED",
+                    "seats.$[elem].lockedBy": userId,
+                    "seats.$[elem].lockedAt": now
+                }
+            },
+            {
+                arrayFilters: [{ "elem.seatId": { $in: seats } }],
+                new: true
+            }
+        );
+
+        res.json({ message: "Seats locked successfully", show: updatedShow });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const unlockSeats = async (req, res) => {
+    try {
+        const { seats } = req.body;
+        const { id: showId } = req.params;
+        const auth = getAuth(req);
+        const userId = auth.userId;
+
+        // Atomic unlock update (only if locked by the same user)
+        const updatedShow = await Show.findOneAndUpdate(
+            { _id: showId },
+            {
+                $set: {
+                    "seats.$[elem].status": "AVAILABLE",
+                    "seats.$[elem].lockedBy": null,
+                    "seats.$[elem].lockedAt": null
+                }
+            },
+            {
+                arrayFilters: [
+                    {
+                        "elem.seatId": { $in: seats },
+                        "elem.lockedBy": userId
+                    }
+                ],
+                new: true
+            }
+        );
+
+        if (!updatedShow) return res.status(404).json({ message: "Show not found" });
+
+        res.json({ message: "Seats unlocked successfully", show: updatedShow });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

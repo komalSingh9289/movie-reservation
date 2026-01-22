@@ -15,6 +15,14 @@ import organizationMovieRoutes from "./routes/organizationMovie.route.js";
 import categoryRoutes from "./routes/category.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import { clerkMiddleware } from "@clerk/express";
+import cron from "node-cron";
+import { unlockExpiredSeats } from "./utils/unlockExpiredSeats.js";
+
+// Run every minute
+cron.schedule("* * * * *", async () => {
+  // console.log("[Cron] Running seat auto-unlock check...");
+  await unlockExpiredSeats();
+});
 
 connectDB();
 

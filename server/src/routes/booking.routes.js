@@ -83,4 +83,49 @@ router.get("/theater", requireAuth, bookingController.getTheaterBookings);
  */
 router.get("/stats", requireAuth, bookingController.getBookingStats);
 
+/**
+ * @swagger
+ * /bookings/verify:
+ *   post:
+ *     summary: Verify payment status
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - orderId
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Payment verification complete
+ */
+router.post("/verify", requireAuth, bookingController.verifyPayment);
+
+/**
+ * @swagger
+ * /bookings/{id}:
+ *   delete:
+ *     summary: Delete a booking and unlock seats
+ *     tags: [Bookings]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Booking deleted successfully
+ */
+router.delete("/:id", requireAuth, bookingController.deleteBooking);
+
 export default router;

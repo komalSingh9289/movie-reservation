@@ -4,9 +4,16 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { Loader2, Armchair, ChevronLeft } from "lucide-react";
+import { Loader2, Armchair, ChevronLeft, Timer } from "lucide-react";
 import axios from "axios";
 import { cn } from "@/lib/utils";
+import Script from "next/script";
+
+declare global {
+  interface Window {
+    Cashfree: any;
+  }
+}
 
 /* ---------------- TYPES ---------------- */
 
@@ -47,6 +54,8 @@ export default function BookingPage() {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isLocking, setIsLocking] = useState(false);
 
   /* ---------------- FETCH DATA ---------------- */
   console.log("id:", id);
@@ -89,49 +98,157 @@ console.log("Show response:", showRes.data);
 
   /* ---------------- HANDLERS ---------------- */
 
-  const handleSeatClick = (seatId: string, status: string) => {
-    if (status !== "AVAILABLE") return;
+  const handleSeatClick = async (seatId: string, status: string) => {
+    if (status !== "AVAILABLE" || isLocking) return;
 
-    setSelectedSeats(prev =>
-      prev.includes(seatId)
-        ? prev.filter(s => s !== seatId)
-        : [...prev, seatId]
-    );
+    const isSelected = selectedSeats.includes(seatId);
+    const newSelection = isSelected
+      ? selectedSeats.filter(s => s !== seatId)
+      : [...selectedSeats, seatId];
+
+    try {
+      setIsLocking(true);
+      const token = await getToken();
+      
+      if (isSelected) {
+        // Unlock
+        await axios.patch(
+          `http://localhost:5000/shows/${showId}/unlock-seats`,
+          { seats: [seatId] },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        // Lock
+        await axios.patch(
+          `http://localhost:5000/shows/${showId}/lock-seats`,
+          { seats: [seatId] },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+
+      setSelectedSeats(newSelection);
+      
+      // Start/Reset timer if seats are selected
+      if (newSelection.length > 0) {
+        if (!timeLeft) setTimeLeft(300); // 5 minutes
+      } else {
+        setTimeLeft(null);
+      }
+    } catch (err: any) {
+      console.error("Lock/Unlock error:", err);
+      alert(err.response?.data?.message || "Failed to update seat status.");
+    } finally {
+      setIsLocking(false);
+    }
   };
 
-  const handleBooking = async () => {
-    if (!isSignedIn) {
-      alert("Please sign in to book tickets.");
+  // Timer effect
+  useEffect(() => {
+    if (timeLeft === null) return;
+
+    if (timeLeft === 0) {
+      alert("Seat lock expired! Please select seats again.");
+      setSelectedSeats([]);
+      setTimeLeft(null);
+      // Refresh show data to see available seats
+      const fetchData = async () => {
+        try {
+          const showRes = await axios.get(`http://localhost:5000/shows/${showId}`);
+          setShow(showRes.data);
+        } catch (err) {
+          console.error("Refresh error:", err);
+        }
+      };
+      fetchData();
       return;
     }
 
-    if (!show || selectedSeats.length === 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => (prev ? prev - 1 : 0));
+    }, 1000);
 
-    try {
-      setBooking(true);
-      const token = await getToken();
+    return () => clearInterval(timer);
+  }, [timeLeft, showId]);
 
-      await axios.post(
-        "http://localhost:5000/bookings",
-        {
-          showId: show._id,
-          seats: selectedSeats,
-          totalAmount: show.price * selectedSeats.length
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+  // Unlock on unmount
+  useEffect(() => {
+    return () => {
+      if (selectedSeats.length > 0) {
+        getToken().then(token => {
+          axios.patch(
+            `http://localhost:5000/shows/${showId}/unlock-seats`,
+            { seats: selectedSeats },
+            { headers: { Authorization: `Bearer ${token}` } }
+          ).catch(err => console.error("Unmount unlock error:", err));
+        });
+      }
+    };
+  }, [selectedSeats, showId, getToken]);
+
+const handleBooking = async () => {
+  if (!isSignedIn) {
+    alert("Please sign in to book tickets.");
+    return;
+  }
+
+  if (!show || selectedSeats.length === 0) return;
+
+  try {
+    setBooking(true);
+    const token = await getToken();
+
+    // 1️⃣ Create booking
+    const res = await axios.post(
+      "http://localhost:5000/bookings",
+      {
+        showId: show._id,
+        seats: selectedSeats,
+        totalAmount: show.price * selectedSeats.length
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+
+    const { payment_session_id, booking } = res.data;
+
+    // 2️⃣ Initialize Cashfree (CORRECT)
+    const cashfree = new (window as any).Cashfree({
+      mode: "sandbox", // production later
+    });
+
+    // 3️⃣ Open checkout
+    cashfree.checkout({
+      paymentSessionId: payment_session_id,
+      redirectTarget: "_self",
+    });
+
+    // 4️⃣ Poll verification after redirect
+    setTimeout(async () => {
+      const verifyRes = await axios.post(
+        "http://localhost:5000/bookings/verify",
+        { orderId: booking.orderId },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert("Booking successful!");
-      router.push("/bookings");
-    } catch (err) {
-      console.error("Booking error:", err);
-      alert("Booking failed.");
-    } finally {
-      setBooking(false);
-    }
-  };
+      if (verifyRes.data.status === "success") {
+        alert("Booking successful 🎉");
+        router.push("/bookings");
+      } else if (verifyRes.data.status === "cancelled") {
+        alert("Payment cancelled");
+      } else {
+        alert("Payment failed");
+      }
+    }, 4000);
+
+  } catch (err: any) {
+    console.error("Booking error:", err);
+    alert(err.response?.data?.message || "Booking failed.");
+  } finally {
+    setBooking(false);
+  }
+};
+
 
   /* ---------------- LOADING / ERROR ---------------- */
 
@@ -190,6 +307,10 @@ console.log("Show response:", showRes.data);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white pt-24 pb-40 px-6">
+      <Script 
+        src="https://sdk.cashfree.com/js/v3/cashfree.js"
+        strategy="beforeInteractive"
+      />
       <div className="max-w-6xl mx-auto space-y-8">
 
         {/* HEADER */}
@@ -208,6 +329,16 @@ console.log("Show response:", showRes.data);
           </div>
           <p className="text-xl font-bold text-purple-400">₹{show.price}</p>
         </div>
+
+        {/* TIMER */}
+        {timeLeft !== null && (
+          <div className="flex items-center justify-center gap-2 bg-purple-500/10 border border-purple-500/20 py-3 rounded-2xl">
+            <Timer className="h-4 w-4 text-purple-400 animate-pulse" />
+            <p className="text-sm font-medium text-purple-300">
+              Seats are locked for {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}
+            </p>
+          </div>
+        )}
 
         {/* LEGEND */}
         <div className="bg-zinc-900/50 rounded-2xl p-6 border border-zinc-800">
@@ -325,13 +456,16 @@ console.log("Show response:", showRes.data);
                 ₹{selectedSeats.length * show.price}
               </p>
             </div>
-            <Button
-              onClick={handleBooking}
-              disabled={!selectedSeats.length || booking}
-              className="bg-purple-600 px-10 py-6 text-lg"
-            >
-              {booking ? <Loader2 className="animate-spin" /> : "Pay Now"}
-            </Button>
+            <div className="flex items-center gap-4">
+              {isLocking && <Loader2 className="animate-spin text-purple-400 h-5 w-5" />}
+              <Button
+                onClick={handleBooking}
+                disabled={!selectedSeats.length || booking || isLocking}
+                className="bg-purple-600 px-10 py-6 text-lg"
+              >
+                {booking ? <Loader2 className="animate-spin" /> : "Pay Now"}
+              </Button>
+            </div>
           </div>
         </div>
 
