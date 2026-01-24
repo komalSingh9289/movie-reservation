@@ -30,41 +30,43 @@ export default function MoviesPage() {
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalMovies, setTotalMovies] = useState(0);
   const { getToken, isSignedIn } = useAuth();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const token = isSignedIn ? await getToken() : null;
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const fetchData = async (page = currentPage) => {
+    try {
+      setLoading(true);
+      const token = isSignedIn ? await getToken() : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const [moviesRes, categoriesRes, favoritesRes] = await Promise.all([
-          axios.get("http://localhost:5000/movies?showingOnly=true"),
-          axios.get("http://localhost:5000/categories"),
-          isSignedIn 
-            ? axios.get("http://localhost:5000/users/favorites", { headers }).catch(() => ({ data: [] }))
-            : Promise.resolve({ data: [] })
-        ]);
-        // console.log("Movies:", moviesRes.data);
-        // console.log("Categories:", categoriesRes.data);
-        // console.log("Favorites:", favoritesRes.data);
+      const [moviesRes, categoriesRes, favoritesRes] = await Promise.all([
+        axios.get(`http://localhost:5000/movies?showingOnly=true&page=${page}&limit=12`),
+        axios.get("http://localhost:5000/categories"),
+        isSignedIn 
+          ? axios.get("http://localhost:5000/users/favorites", { headers }).catch(() => ({ data: [] }))
+          : Promise.resolve({ data: [] })
+      ]);
 
-        setMovies(moviesRes.data);
-        setFavorites(favoritesRes.data.map((f: any) => f._id));
-        
-        if (categoriesRes.data && Array.isArray(categoriesRes.data)) {
-           const categoryNames = categoriesRes.data.map((c: any) => c.name);
-           setCategories(["All", ...categoryNames]);
-        }
-        
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
+      setMovies(moviesRes.data.movies);
+      setTotalPages(moviesRes.data.totalPages || 1);
+      setTotalMovies(moviesRes.data.totalMovies || 0);
+      setFavorites(favoritesRes.data.map((f: any) => f._id));
+      
+      if (categoriesRes.data && Array.isArray(categoriesRes.data)) {
+         const categoryNames = categoriesRes.data.map((c: any) => c.name);
+         setCategories(["All", ...categoryNames]);
       }
-    };
+      
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
   }, [isSignedIn, getToken]);
 
@@ -195,8 +197,19 @@ export default function MoviesPage() {
             </Button>
           </div>
         )}
+
+        <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => {
+                setCurrentPage(page);
+                fetchData(page);
+            }}
+        />
       </div>
     </div>
   );
 }
+
+import Pagination from "@/components/ui/pagination";
 

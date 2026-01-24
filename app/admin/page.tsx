@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const { user } = useUser();
   const { getToken } = useAuth();
   const [dbUser, setDbUser] = useState<any>(null);
@@ -46,17 +48,17 @@ export default function AdminDashboard() {
             });
             setAdminStats(statsRes.data);
             
-             // Fetch Recent Movies (keep existing logic for table)
+             // Fetch Recent Movies (handle paginated response)
             const moviesRes = await api.get("/movies", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setRecentMovies(moviesRes.data.slice(0, 5));
+            setRecentMovies(Array.isArray(moviesRes.data.movies) ? moviesRes.data.movies.slice(0, 5) : []);
 
-            // Fetch Upcoming Shows (keep existing logic)
+            // Fetch Upcoming Shows (handle paginated response)
              const showsRes = await api.get("/shows/upcoming", {
                 headers: { Authorization: `Bearer ${token}` }
-           });
-           setUpcomingShows(showsRes.data);
+            });
+            setUpcomingShows(Array.isArray(showsRes.data.shows) ? showsRes.data.shows : []);
 
         } else {
              // Fallback for regular user or error state?
@@ -102,7 +104,7 @@ export default function AdminDashboard() {
       bg: "bg-pink-500/10",
     },
     {
-      title: "Active Shows Today",
+      title: "Active Shows",
       value: adminStats.activeShows?.total.toString(),
       trend: adminStats.activeShows?.trend,
       icon: Calendar,
@@ -183,7 +185,7 @@ export default function AdminDashboard() {
                     : "Manage your theater's movies, shows, and ticketing performance."}
             </p>
           </div>
-          {!isSuperAdmin && (
+          {isSuperAdmin && (
             <Button className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg h-10 px-6 font-semibold transition-all">
                 <Plus className="w-4 h-4 mr-2" /> Add Movie
             </Button>
@@ -223,7 +225,13 @@ export default function AdminDashboard() {
           <Card className="bg-zinc-900/40 border-zinc-900 rounded-2xl overflow-hidden">
                 <CardHeader className="px-6 py-5 border-b border-zinc-900 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Recent Movies</CardTitle>
-                    <Button variant="ghost" className="text-xs text-zinc-500 hover:text-white px-0 h-auto">View All</Button>
+                    <Button 
+                        variant="ghost" 
+                        className="text-xs text-zinc-500 hover:text-white px-0 h-auto"
+                        onClick={() => router.push("/admin/movies")}
+                    >
+                        View All
+                    </Button>
                 </CardHeader>
                 <CardContent className="p-3 space-y-2">
                     {recentMovies.map((movie: any) => (
@@ -263,6 +271,7 @@ export default function AdminDashboard() {
                         <div
                             key={show._id}
                             className="flex items-center gap-4 p-3 rounded-lg hover:bg-zinc-800/50 cursor-pointer group"
+                            onClick={() => router.push("/admin/shows")}
                         >
                             <div className="w-12 h-10 rounded-lg bg-zinc-800 flex flex-col items-center justify-center border border-zinc-700/50">
                                 <span className="text-[9px] font-bold text-zinc-500 uppercase">

@@ -29,20 +29,30 @@ export const getMovies = async (req, res) => {
     try {
         const { showingOnly } = req.query;
 
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 12;
+        const skip = (page - 1) * limit;
+
+        let query = { isActive: true };
+
         if (showingOnly === "true") {
-            const today = new Date().toISOString().split('T')[0];
             const movieIdsWithShows = await Show.distinct("movie");
-
-            const movies = await Movie.find({
-                _id: { $in: movieIdsWithShows },
-                isActive: true
-            }).populate("category").sort({ createdAt: -1 });
-
-            return res.json(movies);
+            query._id = { $in: movieIdsWithShows };
         }
 
-        const movies = await Movie.find({ isActive: true }).populate("category").sort({ createdAt: -1 });
-        res.json(movies);
+        const total = await Movie.countDocuments(query);
+        const movies = await Movie.find(query)
+            .populate("category")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        res.json({
+            movies,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalMovies: total
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

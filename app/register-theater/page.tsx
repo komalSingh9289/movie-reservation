@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Building2, MapPin, Film, Plus, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { toast } from "react-toastify";
 
 export default function RegisterTheater() {
   const { getToken } = useAuth();
@@ -58,14 +59,15 @@ export default function RegisterTheater() {
       });
 
       if (response.ok) {
+        toast.success("Organization registered successfully!");
         router.push("/admin");
       } else {
         const error = await response.json();
-        alert(error.message || "Registration failed");
+        toast.error(error.message || "Registration failed");
       }
     } catch (error) {
       console.error("Registration error:", error);
-      alert("An unexpected error occurred");
+      toast.error("An unexpected error occurred");
     } finally {
       setLoading(false);
     }

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { useAuth, useUser } from "@clerk/nextjs";
 import MovieCard from "@/components/admin/movies/MovieCard";
 import AddMovieModal from "@/components/admin/movies/AddMovieModal";
+import { toast } from "react-toastify";
+import Pagination from "@/components/ui/pagination";
 
 export default function AdminMoviesPage() {
   const { getToken } = useAuth();
@@ -20,8 +22,12 @@ export default function AdminMoviesPage() {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [editingMovie, setEditingMovie] = useState<any>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<"all" | "added" | "not-added">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalMovies, setTotalMovies] = useState(0);
 
-  const fetchData = async () => {
+  const fetchData = async (page = currentPage) => {
     try {
       const token = await getToken();
       
@@ -34,12 +40,14 @@ export default function AdminMoviesPage() {
       const userData = await userRes.json();
       setDbUser(userData);
 
-      // 2. Fetch global movies
-      const globalRes = await fetch("http://localhost:5000/movies", {
+      // 2. Fetch global movies with pagination
+      const globalRes = await fetch(`http://localhost:5000/movies?page=${page}&limit=12`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const globalData = await globalRes.json();
-      setGlobalMovies(Array.isArray(globalData) ? globalData : []);
+      setGlobalMovies(Array.isArray(globalData.movies) ? globalData.movies : []);
+      setTotalPages(globalData.totalPages || 1);
+      setTotalMovies(globalData.totalMovies || 0);
 
       // 3. Fetch my organization collection if theater admin
       if (userData.role === 'admin') {
@@ -76,9 +84,10 @@ export default function AdminMoviesPage() {
 
       if (response.ok) {
         setMyCollection([...myCollection, movieId]);
+        toast.success("Movie added to collection!");
       } else {
         const error = await response.json();
-        alert(error.message || "Failed to add movie");
+        toast.error(error.message || "Failed to add movie");
       }
     } catch (error) {
       console.error("Error adding movie:", error);
@@ -98,7 +107,7 @@ export default function AdminMoviesPage() {
         fetchData(); // Re-fetch data after deletion
     } catch (error) {
         console.error("Error deleting movie:", error);
-        alert("Failed to delete movie");
+        toast.error("Failed to delete movie");
     }
   };
 
@@ -114,9 +123,15 @@ export default function AdminMoviesPage() {
   };
     
   const isSuperAdmin = dbUser?.role === "super_admin";
-  const filteredMovies = globalMovies.filter(m => 
-    m.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  
+  const filteredMovies = globalMovies.filter(m => {
+    const matchesSearch = m.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const isAdded = myCollection.includes(m._id);
+    
+    if (filterStatus === "added") return matchesSearch && isAdded;
+    if (filterStatus === "not-added") return matchesSearch && !isAdded;
+    return matchesSearch;
+  });
 
   if (loading) {
     return (
@@ -130,7 +145,7 @@ export default function AdminMoviesPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="space-y-8 animate-in fade-in duration-500 pb-20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h1 className="text-3xl font-black text-white tracking-tighter">
@@ -158,6 +173,29 @@ export default function AdminMoviesPage() {
           </div>
         </div>
 
+        {!isSuperAdmin && (
+          <div className="flex items-center gap-2 bg-zinc-900/40 p-1.5 rounded-2xl w-fit border border-zinc-800/50">
+            <button 
+              onClick={() => setFilterStatus("all")}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${filterStatus === 'all' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              All Movies
+            </button>
+            <button 
+              onClick={() => setFilterStatus("added")}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${filterStatus === 'added' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              In Library
+            </button>
+            <button 
+              onClick={() => setFilterStatus("not-added")}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${filterStatus === 'not-added' ? 'bg-zinc-800 text-white shadow-lg shadow-black/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              Not Added
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredMovies.map((movie) => (
             <MovieCard 
@@ -179,6 +217,15 @@ export default function AdminMoviesPage() {
             <p className="text-zinc-500 font-bold uppercase tracking-widest">No movies found in catalog.</p>
           </div>
         )}
+
+        <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => {
+                setCurrentPage(page);
+                fetchData(page);
+            }}
+        />
 
         {/* Edit Modal */}
         <AddMovieModal 

@@ -46,41 +46,47 @@ function BookingsList() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalBookings, setTotalBookings] = useState(0);
+
+  const fetchData = async (page = currentPage) => {
+    try {
+        const token = await getToken();
+        
+        // 1. If order_id exists in URL, verify it first (only on first page load)
+        if (orderIdParam && page === 1) {
+          setVerifying(true);
+          try {
+            await axios.post(
+              "http://localhost:5000/bookings/verify",
+              { orderId: orderIdParam },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          } catch (err) {
+            console.error("Auto-verification error:", err);
+          } finally {
+            setVerifying(false);
+          }
+        }
+
+        // 2. Fetch all bookings with pagination
+        const response = await axios.get(`http://localhost:5000/bookings/user?page=${page}&limit=5`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setBookings(response.data.bookings);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalBookings(response.data.totalBookings || 0);
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
+      } finally {
+        setLoading(false);
+      }
+  };
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      const initPage = async () => {
-        try {
-          const token = await getToken();
-          
-          // 1. If order_id exists in URL, verify it first
-          if (orderIdParam) {
-            setVerifying(true);
-            try {
-              await axios.post(
-                "http://localhost:5000/bookings/verify",
-                { orderId: orderIdParam },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-            } catch (err) {
-              console.error("Auto-verification error:", err);
-            } finally {
-              setVerifying(false);
-            }
-          }
-
-          // 2. Fetch all bookings
-          const response = await axios.get("http://localhost:5000/bookings/user", {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          setBookings(response.data);
-        } catch (error) {
-          console.error("Error fetching bookings:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      initPage();
+      fetchData();
     } else if (isLoaded && !isSignedIn) {
       setLoading(false);
     }
@@ -134,7 +140,7 @@ function BookingsList() {
             </div>
           </div>
           <div className="px-4 py-2 bg-zinc-900/50 border border-zinc-800 rounded-full text-zinc-400 text-sm font-medium">
-            {bookings.length} Total
+            {totalBookings} Total
           </div>
         </div>
 
@@ -252,10 +258,21 @@ function BookingsList() {
             ))}
           </div>
         )}
+
+        <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => {
+                setCurrentPage(page);
+                fetchData(page);
+            }}
+        />
       </div>
     </div>
   );
 }
+
+import Pagination from "@/components/ui/pagination";
 
 export default function BookingsPage() {
   return (

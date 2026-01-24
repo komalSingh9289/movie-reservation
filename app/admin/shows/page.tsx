@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/admin/DashboardLayout";
-import { Calendar, Plus, Clock, Film, Settings, Info, Ticket, Search, Save, X, Trash2, SlidersHorizontal } from "lucide-react";
+import { Calendar, Plus, Clock, Film, Settings, Info, Ticket, Search, Save, X, Trash2, SlidersHorizontal, Edit2, Archive, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { toast } from "react-toastify";
+import Pagination from "@/components/ui/pagination";
 
 export default function ShowsPage() {
   const { getToken } = useAuth();
@@ -21,6 +23,7 @@ export default function ShowsPage() {
 
   const [filterMovie, setFilterMovie] = useState("");
   const [filterDate, setFilterDate] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive" | "archived">("all");
 
   const [formData, setFormData] = useState({
     movie: "",
@@ -30,7 +33,12 @@ export default function ShowsPage() {
     screenId: "",
   });
 
-  const fetchData = async () => {
+  const [editingShowId, setEditingShowId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalShows, setTotalShows] = useState(0);
+
+  const fetchData = async (page = currentPage) => {
     try {
       const token = await getToken();
       
@@ -41,12 +49,14 @@ export default function ShowsPage() {
       const theaterData = await theaterRes.json();
       setTheater(theaterData);
 
-      // Fetch shows
-      const showsRes = await fetch("http://localhost:5000/shows/me", {
+      // Fetch shows with pagination
+      const showsRes = await fetch(`http://localhost:5000/shows/me?page=${page}&limit=9`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const showsData = await showsRes.json();
-      setShows(Array.isArray(showsData) ? showsData : []);
+      setShows(Array.isArray(showsData.shows) ? showsData.shows : []);
+      setTotalPages(showsData.totalPages || 1);
+      setTotalShows(showsData.totalShows || 0);
 
       // Fetch movies for selection (Only from organization collection)
       const moviesRes = await fetch("http://localhost:5000/organization-movies", {
@@ -72,8 +82,12 @@ export default function ShowsPage() {
 
     try {
       const token = await getToken();
-      const response = await fetch("http://localhost:5000/shows", {
-        method: "POST",
+      const url = editingShowId 
+        ? `http://localhost:5000/shows/${editingShowId}`
+        : "http://localhost:5000/shows";
+      
+      const response = await fetch(url, {
+        method: editingShowId ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -83,16 +97,70 @@ export default function ShowsPage() {
 
       if (response.ok) {
         setModalOpen(false);
+        setEditingShowId(null);
         setFormData({ movie: "", date: "", time: "", price: "", screenId: "" });
-        fetchData();
+        toast.success(editingShowId ? "Show updated successfully!" : "Show scheduled successfully!");
+        // Fetch data after a short delay to ensure DB sync
+        setTimeout(() => fetchData(), 500);
       } else {
         const error = await response.json();
-        alert(error.message || "Failed to schedule show");
+        toast.error(error.message || "Failed to save show");
       }
     } catch (error) {
-      console.error("Scheduling error:", error);
+      console.error("Error saving show:", error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleEdit = (show: any) => {
+    setEditingShowId(show._id);
+    setFormData({
+        movie: show.movie?._id,
+        date: show.date,
+        time: show.time,
+        price: show.price.toString(),
+        screenId: show.screenId
+    });
+    setModalOpen(true);
+  };
+
+  const handleCancelShow = async (showId: string) => {
+    if (!statusConfirm("Are you sure you want to cancel this show? This will mark it as CANCELLED.")) return;
+    try {
+        const token = await getToken();
+        const res = await fetch(`http://localhost:5000/shows/${showId}/cancel`, {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+            toast.success("Show cancelled successfully");
+            fetchData();
+        } else {
+            const err = await res.json();
+            toast.error(err.message || "Failed to cancel show");
+        }
+    } catch (error) {
+        toast.error("Error cancelling show");
+    }
+  };
+
+  const handleArchiveShow = async (showId: string) => {
+    try {
+        const token = await getToken();
+        const res = await fetch(`http://localhost:5000/shows/${showId}/archive`, {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+            toast.success("Show archived successfully");
+            fetchData();
+        } else {
+            const err = await res.json();
+            toast.error(err.message || "Failed to archive show");
+        }
+    } catch (error) {
+        toast.error("Error archiving show");
     }
   };
 
@@ -109,14 +177,15 @@ export default function ShowsPage() {
       });
 
       if (response.ok) {
+        toast.success("Show deleted successfully!");
         fetchData();
       } else {
         const error = await response.json();
-        alert(error.message || "Failed to delete show");
+        toast.error(error.message || "Failed to delete show");
       }
     } catch (error) {
       console.error("Deletion error:", error);
-      alert("An error occurred while deleting the show.");
+      toast.error("An error occurred while deleting the show.");
     }
   };
 
@@ -136,11 +205,36 @@ export default function ShowsPage() {
   }
 
   // Filter Logic
-  const filteredShows = shows.filter(show => {
-    const matchesMovie = filterMovie ? show.movie?._id === filterMovie : true;
-    const matchesDate = filterDate ? show.date === filterDate : true;
-    return matchesMovie && matchesDate;
-  });
+    const showStatusFilter = (show: any) => {
+        const [year, month, day] = show.date.split('-').map(Number);
+        const [hour, minute] = show.time.split(':').map(Number);
+        const showDateTime = new Date(year, month - 1, day, hour, minute);
+        const isExpired = showDateTime < new Date();
+        return isExpired;
+    };
+
+    const filteredShows = shows.filter(show => {
+        const matchesMovie = filterMovie ? show.movie?._id === filterMovie : true;
+        const matchesDate = filterDate ? show.date === filterDate : true;
+        
+        const isExpired = showStatusFilter(show);
+        
+        // Filter logic updated to be clearer
+        if (filterStatus === "archived") {
+            return matchesMovie && matchesDate && show.status === "ARCHIVED";
+        }
+        
+        if (filterStatus === "active") {
+            return matchesMovie && matchesDate && !isExpired && show.status === "ACTIVE";
+        }
+
+        if (filterStatus === "inactive") {
+            return matchesMovie && matchesDate && (isExpired || show.status === "CANCELLED");
+        }
+
+        // 'all' shows everything except archived by default
+        return matchesMovie && matchesDate && show.status !== "ARCHIVED";
+    });
 
   return (
     <DashboardLayout>
@@ -187,15 +281,42 @@ export default function ShowsPage() {
                 onChange={(e) => setFilterDate(e.target.value)}
             />
 
-            {(filterMovie || filterDate) && (
+            {(filterMovie || filterDate || filterStatus !== "all") && (
                 <Button 
                     variant="ghost" 
-                    onClick={() => { setFilterMovie(""); setFilterDate(""); }}
+                    onClick={() => { setFilterMovie(""); setFilterDate(""); setFilterStatus("all"); }}
                     className="text-red-400 hover:text-red-300 hover:bg-red-400/10 h-10 px-3"
                 >
                     <X className="w-4 h-4 mr-2" /> Reset
                 </Button>
             )}
+
+            <div className="ml-auto flex items-center gap-1.5 bg-zinc-900/60 p-1 rounded-xl border border-zinc-800">
+                <button 
+                  onClick={() => setFilterStatus("all")}
+                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  All
+                </button>
+                <button 
+                  onClick={() => setFilterStatus("active")}
+                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Active
+                </button>
+                <button 
+                  onClick={() => setFilterStatus("inactive")}
+                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'inactive' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Inactive
+                </button>
+                <button 
+                  onClick={() => setFilterStatus("archived")}
+                  className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${filterStatus === 'archived' ? 'bg-zinc-800 text-purple-400 border border-purple-500/30' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Archived
+                </button>
+            </div>
         </div>
 
         {/* Show List */}
@@ -209,10 +330,35 @@ export default function ShowsPage() {
                                 <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-2.5 py-1 bg-zinc-800/50 rounded-lg border border-zinc-800">
                                     {screen?.name || "Standard Hall"}
                                 </span>
-                                <div className="flex items-center gap-1.5 p-1 px-2.5 bg-emerald-500/10 rounded-full">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active</span>
-                                </div>
+                                {(() => {
+                                    const showDate = new Date(show.date);
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+                                    const isExpired = showDate < today;
+                                    
+                                    let statusConfig = {
+                                        label: "Active",
+                                        colors: "bg-emerald-500/10 text-emerald-400",
+                                        dot: "bg-emerald-500 animate-pulse"
+                                    };
+
+                                    if (show.status === "CANCELLED") {
+                                        statusConfig = { label: "Cancelled", colors: "bg-orange-500/10 text-orange-400", dot: "bg-orange-500" };
+                                    } else if (show.status === "ARCHIVED") {
+                                        statusConfig = { label: "Archived", colors: "bg-zinc-500/10 text-zinc-400", dot: "bg-zinc-500" };
+                                    } else if (isExpired) {
+                                        statusConfig = { label: "Inactive", colors: "bg-red-500/10 text-red-400", dot: "bg-red-500" };
+                                    }
+                                    
+                                    return (
+                                        <div className={`flex items-center gap-1.5 p-1 px-2.5 rounded-full ${statusConfig.colors}`}>
+                                            <div className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
+                                            <span className={`text-[10px] font-bold uppercase tracking-widest`}>
+                                                {statusConfig.label}
+                                            </span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             <CardTitle className="text-xl font-bold text-white group-hover:text-purple-400 transition-colors truncate">
                                 {show.movie?.title}
@@ -236,19 +382,82 @@ export default function ShowsPage() {
                                 </div>
                             </div>
 
-                            <div className="pt-5 border-t border-zinc-800/50 flex items-center justify-between gap-4">
+                             <div className="pt-5 border-t border-zinc-800/50 flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-2">
                                     <Ticket className="w-4 h-4 text-blue-400" />
-                                    <span className="text-xs font-bold text-zinc-400">{show.seats.filter((s:any) => s.status === 'booked').length} / {show.seats.length} booked</span>
+                                    <span className="text-xs font-bold text-zinc-400">
+                                        {(show.seats || []).filter((s:any) => s.status === 'BOOKED' || s.status === 'booked' || s.status?.toUpperCase() === 'BOOKED').length} / {show.seats?.length || 0} booked
+                                    </span>
                                 </div>
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    onClick={() => handleDelete(show._id)}
-                                    className="h-9 w-9 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                    {(() => {
+                                        const isExpired = showStatusFilter(show);
+                                        const todayStr = new Date().toISOString().split('T')[0];
+                                        const isUpcomingOrToday = show.date >= todayStr;
+                                        
+                                        // Edit/Cancel available for active shows that are upcoming or today
+                                        const canEditCancel = isUpcomingOrToday && show.status === "ACTIVE";
+                                        // Delete available for any show that is upcoming/today (even if cancelled)
+                                        const canDelete = isUpcomingOrToday && show.status !== "ARCHIVED";
+
+                                        return (
+                                            <>
+                                                {canEditCancel && (
+                                                    <>
+                                                        <Button 
+                                                            variant="ghost" size="icon" 
+                                                            onClick={() => handleEdit(show)}
+                                                            className="h-8 w-8 text-zinc-500 hover:text-purple-400 rounded-lg"
+                                                            title="Edit Show"
+                                                        >
+                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost" size="icon" 
+                                                            onClick={() => handleCancelShow(show._id)}
+                                                            className="h-8 w-8 text-zinc-500 hover:text-orange-400 rounded-lg"
+                                                            title="Cancel Show"
+                                                        >
+                                                            <Ban className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                {canDelete && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        onClick={() => handleDelete(show._id)}
+                                                        className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg"
+                                                        title="Delete Permanently"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                )}
+                                                {isExpired && show.status !== "ARCHIVED" && (
+                                                    <Button 
+                                                        variant="ghost" size="icon" 
+                                                        onClick={() => handleArchiveShow(show._id)}
+                                                        className="h-8 w-8 text-zinc-500 hover:text-blue-400 rounded-lg"
+                                                        title="Archive Show"
+                                                    >
+                                                        <Archive className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                )}
+                                                {show.status === "ARCHIVED" && (
+                                                     <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        onClick={() => handleDelete(show._id)}
+                                                        className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg"
+                                                        title="Delete Permanently"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -261,6 +470,15 @@ export default function ShowsPage() {
             )}
         </div>
 
+        <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => {
+                setCurrentPage(page);
+                fetchData(page);
+            }}
+        />
+
         {/* Custom Modal */}
         {modalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
@@ -268,10 +486,10 @@ export default function ShowsPage() {
                     <form onSubmit={handleSubmit}>
                         <div className="p-8 border-b border-zinc-800 flex items-center justify-between">
                             <div>
-                                <h2 className="text-xl font-bold text-white tracking-tight">Schedule New Screening</h2>
+                                <h2 className="text-xl font-bold text-white tracking-tight">{editingShowId ? "Update Screening" : "Schedule New Screening"}</h2>
                                 <p className="text-zinc-500 text-xs mt-1">Configure movie, time and theater hall allocation.</p>
                             </div>
-                            <Button type="button" onClick={() => setModalOpen(false)} variant="ghost" size="icon" className="rounded-xl hover:bg-zinc-800 text-zinc-500">
+                            <Button type="button" onClick={() => { setModalOpen(false); setEditingShowId(null); }} variant="ghost" size="icon" className="rounded-xl hover:bg-zinc-800 text-zinc-500">
                                 <X className="w-5 h-5" />
                             </Button>
                         </div>
@@ -280,10 +498,11 @@ export default function ShowsPage() {
                             <div className="space-y-2">
                                 <Label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black px-1">Select Movie</Label>
                                 <select 
-                                    className="w-full h-12 bg-zinc-800/50 border border-zinc-800 focus:border-purple-500/50 rounded-xl text-white px-4 appearance-none outline-none transition-all text-sm"
+                                    className="w-full h-12 bg-zinc-800/50 border border-zinc-800 focus:border-purple-500/50 rounded-xl text-white px-4 appearance-none outline-none transition-all text-sm disabled:opacity-50"
                                     value={formData.movie}
                                     onChange={(e) => setFormData({...formData, movie: e.target.value})}
                                     required
+                                    disabled={!!editingShowId}
                                 >
                                     <option value="" disabled className="bg-zinc-900">Choose a movie...</option>
                                     {movies.map(m => <option key={m._id} value={m._id} className="bg-zinc-900">{m.title}</option>)}
@@ -313,14 +532,15 @@ export default function ShowsPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black px-1">Allocate Screen</Label>
                                     <select 
-                                        className="w-full h-12 bg-zinc-800/50 border border-zinc-800 focus:border-purple-500/50 rounded-xl text-white px-4 appearance-none outline-none transition-all text-sm"
+                                        className="w-full h-12 bg-zinc-800/50 border border-zinc-800 focus:border-purple-500/50 rounded-xl text-white px-4 appearance-none outline-none transition-all text-sm disabled:opacity-50"
                                         value={formData.screenId}
                                         onChange={(e) => setFormData({...formData, screenId: e.target.value})}
                                         required
+                                        disabled={!!editingShowId}
                                     >
                                         <option value="" disabled className="bg-zinc-900">Select hall...</option>
                                         {theater?.screens?.map((s:any) => <option key={s._id} value={s._id} className="bg-zinc-900">{s.name} ({s.capacity} seats)</option>)}
@@ -341,7 +561,7 @@ export default function ShowsPage() {
                         </div>
 
                         <div className="p-8 bg-zinc-800/30 border-t border-zinc-800 flex justify-end gap-4 mt-4">
-                            <Button type="button" onClick={() => setModalOpen(false)} variant="ghost" className="rounded-xl text-zinc-400 hover:bg-zinc-800 px-6 font-bold">
+                            <Button type="button" onClick={() => { setModalOpen(false); setEditingShowId(null); }} variant="ghost" className="rounded-xl text-zinc-400 hover:bg-zinc-800 px-6 font-bold">
                                 Cancel
                             </Button>
                             <Button 
@@ -349,7 +569,7 @@ export default function ShowsPage() {
                                 disabled={submitting}
                                 className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-12 px-10 font-black shadow-lg shadow-purple-600/20 active:scale-95 transition-all"
                             >
-                                {submitting ? "Syncing..." : "Finalize Schedule"}
+                                {submitting ? "Syncing..." : (editingShowId ? "Update Schedule" : "Finalize Schedule")}
                             </Button>
                         </div>
                     </form>

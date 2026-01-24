@@ -69,6 +69,11 @@ const showSchema = new mongoose.Schema(
     },
 
     seats: [seatSchema],
+    status: {
+      type: String,
+      enum: ["ACTIVE", "CANCELLED", "ARCHIVED"],
+      default: "ACTIVE",
+    },
   },
   { timestamps: true }
 );

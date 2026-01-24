@@ -9,6 +9,7 @@ import axios from "axios";
 import { cn } from "@/lib/utils";
 import Script from "next/script";
 import { io, Socket } from "socket.io-client";
+import { toast } from "react-toastify";
 
 declare global {
   interface Window {
@@ -195,7 +196,7 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
       if (timeLeft === null) setTimeLeft(300);
     }
   } catch (e: any) {
-    alert(e.response?.data?.message || "Seat update failed");
+    toast.error(e.response?.data?.message || "Seat update failed");
   } finally {
     setIsLocking(false);
   }
@@ -207,7 +208,7 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
     if (timeLeft === null) return;
 
     if (timeLeft === 0) {
-      alert("Seat lock expired! Please select seats again.");
+      toast.warning("Seat lock expired! Please select seats again.");
     
       setTimeLeft(null);
       
@@ -256,7 +257,7 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
 
   const handleBooking = async () => {
     if (!isSignedIn) {
-      alert("Please sign in to book tickets.");
+      toast.info("Please sign in to book tickets.");
       return;
     }
 
@@ -297,18 +298,18 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
         );
 
         if (verifyRes.data.status === "success") {
-          alert("Booking successful 🎉");
+          toast.success("Booking successful 🎉");
           router.push("/bookings");
         } else if (verifyRes.data.status === "cancelled") {
-          alert("Payment cancelled");
+          toast.info("Payment cancelled");
         } else {
-          alert("Payment failed");
+          toast.error("Payment failed");
         }
       }, 4000);
 
     } catch (err: any) {
       console.error("Booking error:", err);
-      alert(err.response?.data?.message || "Booking failed.");
+      toast.error(err.response?.data?.message || "Booking failed.");
     } finally {
       setBooking(false);
     }

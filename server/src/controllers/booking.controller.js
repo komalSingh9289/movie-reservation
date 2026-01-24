@@ -238,7 +238,11 @@ export const getUserBookings = async (req, res) => {
     try {
         const auth = getAuth(req);
         const userId = auth.userId;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
 
+        const total = await Booking.countDocuments({ userId });
         const bookings = await Booking.find({ userId })
             .populate({
                 path: "show",
@@ -246,9 +250,16 @@ export const getUserBookings = async (req, res) => {
                     path: "movie"
                 }
             })
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        res.json(bookings);
+        res.json({
+            bookings,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalBookings: total
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -258,22 +269,55 @@ export const getTheaterBookings = async (req, res) => {
     try {
         const auth = getAuth(req);
         const user = await User.findOne({ clerkId: auth.userId });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 15;
+        const skip = (page - 1) * limit;
 
         if (!user || (user.role !== "admin" && user.role !== "super_admin")) {
             return res.status(403).json({ message: "Unauthorized" });
         }
 
         let query = {};
-        const bookings = await Booking.find()
+        if (user.role === "admin") {
+            // We need to filter by theaterId in the show population
+            // Alternatively, find shows first or use aggregation
+            const theaterShows = await Show.find({ theater: user.theaterId }).distinct("_id");
+            query.show = { $in: theaterShows };
+        }
+
+        const total = await Booking.countDocuments(query);
+        const bookingsData = await Booking.find(query)
             .populate({
                 path: "show",
-                match: user.role === "admin" ? { theater: user.theaterId } : {},
-                populate: { path: "movie" }
+                populate: [
+                    { path: "movie" },
+                    { path: "theater" }
+                ]
             })
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(); // Use lean for easier manual manipulation
 
-        const filteredBookings = bookings.filter(b => b.show !== null);
-        res.json(filteredBookings);
+        // Manually join User names
+        const clerkIds = [...new Set(bookingsData.map(b => b.userId))];
+        const localUsers = await User.find({ clerkId: { $in: clerkIds } });
+        const userMap = localUsers.reduce((acc, u) => {
+            acc[u.clerkId] = u.name || "Unknown User";
+            return acc;
+        }, {});
+
+        const bookings = bookingsData.map(b => ({
+            ...b,
+            userName: userMap[b.userId] || "Unknown User"
+        }));
+
+        res.json({
+            bookings,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalBookings: total
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

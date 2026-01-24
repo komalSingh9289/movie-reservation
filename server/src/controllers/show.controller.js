@@ -90,15 +90,22 @@ export const getShowsByMovie = async (req, res) => {
         const now = new Date();
         const shows = await Show.find({
             movie: req.params.movieId,
+            // Get shows from today (UTC date) onwards to ensure we don't miss any due to timezone offsets
             date: { $gte: now.toISOString().split('T')[0] }
         })
             .populate("movie")
             .populate("theater")
             .sort({ date: 1, time: 1 });
 
-        // Filter out shows that started today but in the past
+        // Filter out shows that are in the past
         const filteredShows = shows.filter(show => {
-            const showStartTime = new Date(`${show.date}T${show.time}:00`);
+            // Robust parsing: "2026-01-23" or "2026-1-23" and "18:00" or "9:00"
+            const [year, month, day] = show.date.split('-').map(Number);
+            const [hours, minutes] = show.time.split(':').map(Number);
+
+            // Create date in local time
+            const showStartTime = new Date(year, month - 1, day, hours, minutes);
+
             return showStartTime > now;
         });
 
@@ -125,6 +132,9 @@ export const getShowById = async (req, res) => {
 export const getAdminShows = async (req, res) => {
     try {
         let theaterId = req.dbUser.theaterId;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
 
         if (!theaterId) {
             const org = await Organization.findOne({ adminId: req.dbUser._id });
@@ -138,11 +148,84 @@ export const getAdminShows = async (req, res) => {
         }
 
         const query = { theater: theaterId };
+
+        const total = await Show.countDocuments(query);
         const shows = await Show.find(query)
             .populate("movie")
-            .sort({ date: 1, time: 1 });
+            .sort({ date: 1, time: 1 })
+            .skip(skip)
+            .limit(limit);
 
-        res.json(shows);
+        res.json({
+            shows,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalShows: total
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const updateShow = async (req, res) => {
+    try {
+        const { date, time, price } = req.body;
+        const show = await Show.findById(req.params.id);
+
+        if (!show) return res.status(404).json({ message: "Show not found" });
+
+        const now = new Date();
+        const showStartTime = new Date(`${show.date}T${show.time}:00`);
+        if (now > showStartTime) {
+            return res.status(400).json({ message: "Cannot edit an expired/started show" });
+        }
+
+        const updatedShow = await Show.findByIdAndUpdate(
+            req.params.id,
+            { date, time, price },
+            { new: true }
+        ).populate("movie");
+
+        res.json(updatedShow);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const cancelShow = async (req, res) => {
+    try {
+        const show = await Show.findById(req.params.id);
+        if (!show) return res.status(404).json({ message: "Show not found" });
+
+        const now = new Date();
+        const showStartTime = new Date(`${show.date}T${show.time}:00`);
+        if (now > showStartTime) {
+            return res.status(400).json({ message: "Cannot cancel an expired/started show" });
+        }
+
+        show.status = "CANCELLED";
+        await show.save();
+        res.json({ message: "Show cancelled successfully", show });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const archiveShow = async (req, res) => {
+    try {
+        const show = await Show.findById(req.params.id);
+        if (!show) return res.status(404).json({ message: "Show not found" });
+
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+
+        if (show.date > todayStr) {
+            return res.status(400).json({ message: "Cannot archive a future show" });
+        }
+
+        show.status = "ARCHIVED";
+        await show.save();
+        res.json({ message: "Show archived successfully", show });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -151,21 +234,38 @@ export const getAdminShows = async (req, res) => {
 export const getUpcomingShows = async (req, res) => {
     try {
         const now = new Date();
-        const shows = await Show.find({
-            date: { $gte: now.toISOString().split('T')[0] }
-        })
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const query = {
+            date: { $gte: now.toISOString().split('T')[0] },
+            status: "ACTIVE"
+        };
+
+        const shows = await Show.find(query)
             .populate("movie")
             .populate("theater")
-            .sort({ date: 1, time: 1 })
-            .limit(5);
+            .sort({ date: 1, time: 1 });
 
-        // Filter out shows that started today but in the past
+        // Filter out shows that are in the past
         const filteredShows = shows.filter(show => {
-            const showStartTime = new Date(`${show.date}T${show.time}:00`);
+            const [year, month, day] = show.date.split('-').map(Number);
+            const [hours, minutes] = show.time.split(':').map(Number);
+            const showStartTime = new Date(year, month - 1, day, hours, minutes);
+
             return showStartTime > now;
         });
 
-        res.json(filteredShows);
+        const total = filteredShows.length;
+        const pagedShows = filteredShows.slice(skip, skip + limit);
+
+        res.json({
+            shows: pagedShows,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalShows: total
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

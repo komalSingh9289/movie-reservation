@@ -28,7 +28,7 @@ export const getAdminStats = async (req, res) => {
             const totalMovies = await Movie.countDocuments();
             const moviesThisMonth = await Movie.countDocuments({ createdAt: { $gte: startOfMonth } });
 
-            const activeShowsToday = await Show.countDocuments({ date: todayDateString });
+            const activeShowsToday = await Show.countDocuments({ date: { $gte: todayDateString } });
             const activeShowsYesterday = await Show.countDocuments({ date: yesterdayDateString });
 
             const showsTrend = activeShowsToday - activeShowsYesterday;
@@ -100,7 +100,7 @@ export const getAdminStats = async (req, res) => {
             const revenueTrendStr = `${revenueTrend > 0 ? '+' : ''}${revenueTrend.toFixed(1)}% vs last month`;
 
             const totalMovies = await OrganizationMovie.countDocuments({ organizationId, isActive: true });
-            const activeShowsToday = await Show.countDocuments({ organization: organizationId, date: todayDateString });
+            const activeShowsToday = await Show.countDocuments({ organization: organizationId, date: { $gte: todayDateString } });
             const totalBookings = revenueAgg[0].totalBookings[0]?.count || 0;
             const bookingsToday = revenueAgg[0].bookingsToday[0]?.count || 0;
 

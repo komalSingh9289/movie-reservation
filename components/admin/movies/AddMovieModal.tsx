@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Loader2, Image as ImageIcon, Film, Globe, Clock, Calendar } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import api from "@/lib/axios";
+import { toast } from "react-toastify";
 
 interface AddMovieModalProps {
   onMovieAdded: () => void;
@@ -110,7 +111,7 @@ export default function AddMovieModal({ onMovieAdded, movieToEdit, open: control
       }
     } catch (error: any) {
       console.error("Error saving movie:", error);
-      alert(error.response?.data?.message || "Failed to save movie");
+      toast.error(error.response?.data?.message || "Failed to save movie");
     } finally {
       setLoading(false);
     }

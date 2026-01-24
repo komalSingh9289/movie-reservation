@@ -128,6 +128,9 @@ router.get("/:id", showController.getShowById);
  *         description: Show not found
  */
 router.delete("/:id", isAdmin, showController.deleteShow);
+router.put("/:id", isAdmin, showController.updateShow);
+router.patch("/:id/cancel", isAdmin, showController.cancelShow);
+router.patch("/:id/archive", isAdmin, showController.archiveShow);
 
 /**
  * @swagger
