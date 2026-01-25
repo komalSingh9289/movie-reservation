@@ -85,13 +85,15 @@ Example APIs include:
 
 ---
 
-## 🏗️ Project Status
+## Screenshots
 
-🚧 **Ongoing**
-- Core functionality completed
-- Admin panel finished (Organization Admin)
-- Currently refining flows and edge cases
-- Super Admin dashboard enhancements in progress
+<img width="1354" height="608" alt="Image" src="https://github.com/user-attachments/assets/2bd17d6e-3d58-49e2-bb6d-cf4ee2408687" />
+<img width="1366" height="768" alt="Image" src="https://github.com/user-attachments/assets/bbbf9f18-b031-4b11-8279-d2593f36dc25" />
+<img width="1366" height="768" alt="Image" src="https://github.com/user-attachments/assets/cfddd4c1-8b03-4669-a10f-47329a774e2d" />
+<img width="1366" height="768" alt="Image" src="https://github.com/user-attachments/assets/99e5c83a-350b-4665-b58f-266143df1024" />
+<img width="1366" height="768" alt="Image" src="https://github.com/user-attachments/assets/588a900e-a707-4e32-88ca-f433eae5f741" />
+<img width="1366" height="768" alt="Image" src="https://github.com/user-attachments/assets/50cd50f9-669a-42ce-9183-b223444f7261" />
+<img width="1366" height="768" alt="Image" src="https://github.com/user-attachments/assets/a6e94641-34f5-4b74-b78d-6125a66babd2" />
 
 ---
 
