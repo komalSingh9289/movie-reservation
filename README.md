@@ -1,36 +1,114 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎬 Movie Reservation System (Real-Time Seat Locking)
 
-## Getting Started
+A full-stack movie reservation system inspired by platforms like **BookMyShow**, focused on solving a real-world problem:  
+👉 *Preventing multiple users from selecting the same seat at the same time.*
 
-First, run the development server:
+This project implements **real-time seat locking**, role-based admin panels, and clean API documentation using Swagger.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 🎟️ User Features
+- Browse movies and shows
+- Select seats with **real-time locking**
+- Prevents double booking and race conditions
+- Seat locks are **user-specific and time-bound**
+- Smooth and responsive UI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🧑‍💼 Admin Features (Organization Admin)
+- Create and manage movie shows
+- Update or delete **expired shows** (based on date & time)
+- Control show availability and schedules
+- Organization-level access control
 
-## Learn More
+### 🛡️ Super Admin Features
+- Manage global categories
+- Create, update, and delete movies
+- Control organization-level movie assignments
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## ⚙️ Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Frontend**
+- Next.js (React)
+- Tailwind CSS
 
-## Deploy on Vercel
+**Backend**
+- Node.js
+- Express.js
+- MongoDB
+- Socket.IO (WebSockets)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Authentication & Security**
+- Clerk Authentication
+- Role-based access control (Super Admin / Org Admin / User)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**API Documentation**
+- Swagger (OpenAPI)
+
+---
+
+## 🔁 Real-Time Seat Locking (Core Logic)
+
+- When a user selects a seat, it is **instantly locked**
+- Other users see the seat as unavailable **in real time**
+- Locks expire automatically if booking is not completed
+- Server remains the **source of truth** to avoid inconsistencies
+
+> This approach ensures safe concurrency handling even with multiple users selecting seats simultaneously.
+
+---
+
+## 📚 API Documentation
+
+The project uses **Swagger** for API documentation, making it easy for developers to:
+- Understand available endpoints
+- Test APIs directly from the browser
+- View role-based access (locked endpoints)
+
+Example APIs include:
+- Categories (Super Admin only)
+- Movies management
+- Organization-specific movie collections
+
+---
+
+## 🧠 What I Learned
+
+- Real-time state synchronization using WebSockets
+- Handling concurrency and race conditions
+- Designing role-based admin systems
+- Optimistic UI vs server-side validation
+- Writing clean, developer-friendly API documentation
+
+---
+
+## 🏗️ Project Status
+
+🚧 **Ongoing**
+- Core functionality completed
+- Admin panel finished (Organization Admin)
+- Currently refining flows and edge cases
+- Super Admin dashboard enhancements in progress
+
+---
+
+## 📌 Why This Project?
+
+Instead of building just a portfolio project, I wanted to:
+- Solve a **real-world system design problem**
+- Build something scalable and practical
+- Learn how real platforms handle multi-user conflicts
+
+---
+
+## 👩‍💻 Author
+
+**Komal Singh**  
+MERN Stack Developer | Full-Stack Enthusiast  
+Learning by building real products 🚀
+
+---
+
