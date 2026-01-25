@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { Heart, Trash2, Calendar, Star, Loader2, ArrowLeft, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import axios from "axios";
+import api from "@/lib/axios";
 import { cn } from "@/lib/utils";
 
 interface Movie {
@@ -29,7 +29,7 @@ export default function FavouritesPage() {
     try {
       setLoading(true);
       const token = await getToken();
-      const res = await axios.get("http://localhost:5000/users/favorites", {
+      const res = await api.get("users/favorites", {
         headers: { Authorization: `Bearer ${token}` }
       });
       setFavorites(res.data);
@@ -50,7 +50,7 @@ export default function FavouritesPage() {
     try {
       setRemovingId(movieId);
       const token = await getToken();
-      await axios.post(`http://localhost:5000/users/favorites/${movieId}`, {}, {
+      await api.post(`users/favorites/${movieId}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setFavorites(prev => prev.filter(m => m._id !== movieId));

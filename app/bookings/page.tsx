@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
-import axios from "axios";
+import api from "@/lib/axios";
 import { Ticket, Calendar, Clock, Armchair, Loader2, ChevronRight, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -58,8 +58,8 @@ function BookingsList() {
         if (orderIdParam && page === 1) {
           setVerifying(true);
           try {
-            await axios.post(
-              "http://localhost:5000/bookings/verify",
+            await api.post(
+              "bookings/verify",
               { orderId: orderIdParam },
               { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -71,7 +71,7 @@ function BookingsList() {
         }
 
         // 2. Fetch all bookings with pagination
-        const response = await axios.get(`http://localhost:5000/bookings/user?page=${page}&limit=5`, {
+        const response = await api.get(`bookings/user?page=${page}&limit=5`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setBookings(response.data.bookings);

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { movies as staticMovies } from "@/data/movies";
 import { Play, Calendar, Star, MoveRight, Loader2 } from "lucide-react";
-import axios from "axios";
+import api from "@/lib/axios";
 
 interface Movie {
   _id: string;
@@ -24,8 +24,12 @@ export default function Home() {
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/movies");
-        setMovies(res.data.slice(0, 4));
+        const res = await api.get("movies");
+        if (res.data && Array.isArray(res.data.movies)) {
+          setMovies(res.data.movies.slice(0, 4));
+        } else if (Array.isArray(res.data)) {
+          setMovies(res.data.slice(0, 4));
+        }
       } catch (error) {
         console.error("Error fetching trending movies:", error);
       } finally {

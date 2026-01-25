@@ -85,7 +85,7 @@ export default function MovieCard({
           <div className="flex gap-2">
             <Button
               size="sm"
-              variant="outline"
+              variant="default"
               className="flex-1 h-8 text-[9px] uppercase tracking-widest border-zinc-700 hover:bg-zinc-800 text-white"
               onClick={() => onEdit?.(movie)}
             >
@@ -94,7 +94,7 @@ export default function MovieCard({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 h-8 text-[9px] uppercase tracking-widest border-zinc-700 text-rose-400 hover:bg-rose-500/10"
+              className="flex-1 h-8 text-[9px] uppercase tracking-widest border-zinc-700 text-rose-400 hover:bg-rose-500/10 hover:text-rose-400"
               onClick={() => onDelete?.(movie._id)}
             >
               Delete

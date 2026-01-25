@@ -9,11 +9,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
-        // You can attach token here if you store it in localStorage 
-        // or pass it via headers in individual requests. 
-        // We will handle token attachment in the components for now using Clerk's getToken
-        // but having this centralized instance allows future flexibility.
-        return config;
+       return config;
     },
     (error) => {
         return Promise.reject(error);

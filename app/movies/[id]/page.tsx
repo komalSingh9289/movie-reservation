@@ -13,7 +13,7 @@ import {
   ChevronLeft,
   Filter,
 } from "lucide-react";
-import axios from "axios";
+import api from "@/lib/axios";
 import { cn } from "@/lib/utils";
 import { socket } from "@/lib/socket";
 
@@ -53,8 +53,8 @@ export default function TheaterSelectionPage() {
       try {
         setLoading(true);
         const [movieRes, showsRes] = await Promise.all([
-          axios.get(`http://localhost:5000/movies/${id}`),
-          axios.get(`http://localhost:5000/shows/movie/${id}`),
+          api.get(`movies/${id}`),
+          api.get(`shows/movie/${id}`),
         ]);
 
         setMovie(movieRes.data);

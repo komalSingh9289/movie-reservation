@@ -4,6 +4,8 @@ import Movie from "../models/movies.js";
 import Show from "../models/show.js";
 import Booking from "../models/booking.js";
 import OrganizationMovie from "../models/organizationMovie.js";
+import Category from "../models/category.js";
+
 
 export const getAdminStats = async (req, res) => {
     try {
@@ -115,6 +117,49 @@ export const getAdminStats = async (req, res) => {
         return res.status(403).json({ message: "Access denied" });
     } catch (error) {
         console.error("Error fetching admin stats:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export const getCategoryStats = async (req, res) => {
+    try {
+        if (req.dbUser.role !== "super_admin" && req.dbUser.role !== "admin") {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        // Get movies grouped by category
+        const categoryStats = await Movie.aggregate([
+            {
+                $match: { category: { $exists: true, $ne: null } }
+            },
+            {
+                $group: {
+                    _id: "$category",
+                    count: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { count: -1 }
+            }
+        ]);
+
+        // Now fetch category names
+        const categoryIds = categoryStats.map(stat => stat._id);
+        const categories = await Category.find({ _id: { $in: categoryIds } });
+
+        // Combine the data
+        const result = categoryStats.map(stat => {
+            const category = categories.find(cat => cat._id.toString() === stat._id.toString());
+            return {
+                _id: stat._id,
+                name: category ? category.name : 'Unknown',
+                count: stat.count
+            };
+        });
+
+        res.json(result);
+    } catch (error) {
+        console.error("Error fetching category stats:", error);
         res.status(500).json({ message: error.message });
     }
 };

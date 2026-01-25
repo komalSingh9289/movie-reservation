@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Building2, MapPin, Film, Plus, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { toast } from "react-toastify";
+import api from "@/lib/axios";
 
 export default function RegisterTheater() {
   const { getToken } = useAuth();
@@ -49,25 +50,15 @@ export default function RegisterTheater() {
 
     try {
       const token = await getToken();
-      const response = await fetch("http://localhost:5000/theaters/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
+      const response = await api.post("theaters/register", formData, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        toast.success("Organization registered successfully!");
-        router.push("/admin");
-      } else {
-        const error = await response.json();
-        toast.error(error.message || "Registration failed");
-      }
+      toast.success("Organization registered successfully!");
+      router.push("/admin");
     } catch (error) {
       console.error("Registration error:", error);
-      toast.error("An unexpected error occurred");
+      toast.error(error.response?.data?.message || "Registration failed");
     } finally {
       setLoading(false);
     }

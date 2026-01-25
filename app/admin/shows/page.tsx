@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { toast } from "react-toastify";
 import Pagination from "@/components/ui/pagination";
+import api from "@/lib/axios";
 
 export default function ShowsPage() {
   const { getToken } = useAuth();
@@ -43,26 +44,27 @@ export default function ShowsPage() {
       const token = await getToken();
       
       // Fetch theater details
-      const theaterRes = await fetch("http://localhost:5000/theaters/me", {
+      const theaterRes = await api.get("theaters/me", {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const theaterData = await theaterRes.json();
+      const theaterData = theaterRes.data;
+      console.log(theaterData);
       setTheater(theaterData);
 
       // Fetch shows with pagination
-      const showsRes = await fetch(`http://localhost:5000/shows/me?page=${page}&limit=9`, {
+      const showsRes = await api.get(`shows/me?page=${page}&limit=9`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const showsData = await showsRes.json();
+      const showsData = showsRes.data;
       setShows(Array.isArray(showsData.shows) ? showsData.shows : []);
       setTotalPages(showsData.totalPages || 1);
       setTotalShows(showsData.totalShows || 0);
 
       // Fetch movies for selection (Only from organization collection)
-      const moviesRes = await fetch("http://localhost:5000/organization-movies", {
+      const moviesRes = await api.get("organization-movies", {
          headers: { Authorization: `Bearer ${token}` }
       });
-      const moviesData = await moviesRes.json();
+      const moviesData = moviesRes.data;
       setMovies(Array.isArray(moviesData) ? moviesData.map((m: any) => m.movieId) : []);
       
     } catch (error) {
@@ -83,31 +85,25 @@ export default function ShowsPage() {
     try {
       const token = await getToken();
       const url = editingShowId 
-        ? `http://localhost:5000/shows/${editingShowId}`
-        : "http://localhost:5000/shows";
+        ? `shows/${editingShowId}`
+        : "shows";
       
-      const response = await fetch(url, {
+      const response = await api({
         method: editingShowId ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
+        url,
+        data: formData,
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        setModalOpen(false);
-        setEditingShowId(null);
-        setFormData({ movie: "", date: "", time: "", price: "", screenId: "" });
-        toast.success(editingShowId ? "Show updated successfully!" : "Show scheduled successfully!");
-        // Fetch data after a short delay to ensure DB sync
-        setTimeout(() => fetchData(), 500);
-      } else {
-        const error = await response.json();
-        toast.error(error.message || "Failed to save show");
-      }
+      setModalOpen(false);
+      setEditingShowId(null);
+      setFormData({ movie: "", date: "", time: "", price: "", screenId: "" });
+      toast.success(editingShowId ? "Show updated successfully!" : "Show scheduled successfully!");
+      // Fetch data after a short delay to ensure DB sync
+      setTimeout(() => fetchData(), 500);
     } catch (error) {
       console.error("Error saving show:", error);
+      toast.error(error.response?.data?.message || "Failed to save show");
     } finally {
       setSubmitting(false);
     }
@@ -129,38 +125,28 @@ export default function ShowsPage() {
     if (!statusConfirm("Are you sure you want to cancel this show? This will mark it as CANCELLED.")) return;
     try {
         const token = await getToken();
-        const res = await fetch(`http://localhost:5000/shows/${showId}/cancel`, {
-            method: "PATCH",
+        const res = await api.patch(`shows/${showId}/cancel`, {}, {
             headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.ok) {
-            toast.success("Show cancelled successfully");
-            fetchData();
-        } else {
-            const err = await res.json();
-            toast.error(err.message || "Failed to cancel show");
-        }
+        toast.success("Show cancelled successfully");
+        fetchData();
     } catch (error) {
-        toast.error("Error cancelling show");
+        console.error("Error cancelling show:", error);
+        toast.error(error.response?.data?.message || "Error cancelling show");
     }
   };
 
   const handleArchiveShow = async (showId: string) => {
     try {
         const token = await getToken();
-        const res = await fetch(`http://localhost:5000/shows/${showId}/archive`, {
-            method: "PATCH",
+        const res = await api.patch(`shows/${showId}/archive`, {}, {
             headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.ok) {
-            toast.success("Show archived successfully");
-            fetchData();
-        } else {
-            const err = await res.json();
-            toast.error(err.message || "Failed to archive show");
-        }
+        toast.success("Show archived successfully");
+        fetchData();
     } catch (error) {
-        toast.error("Error archiving show");
+        console.error("Error archiving show:", error);
+        toast.error(error.response?.data?.message || "Failed to archive show");
     }
   };
 
@@ -169,23 +155,15 @@ export default function ShowsPage() {
     
     try {
       const token = await getToken();
-      const response = await fetch(`http://localhost:5000/shows/${showId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await api.delete(`shows/${showId}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        toast.success("Show deleted successfully!");
-        fetchData();
-      } else {
-        const error = await response.json();
-        toast.error(error.message || "Failed to delete show");
-      }
+      toast.success("Show deleted successfully!");
+      fetchData();
     } catch (error) {
       console.error("Deletion error:", error);
-      toast.error("An error occurred while deleting the show.");
+      toast.error(error.response?.data?.message || "Failed to delete show");
     }
   };
 

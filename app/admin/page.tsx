@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
   });
   const [recentMovies, setRecentMovies] = useState([]);
   const [upcomingShows, setUpcomingShows] = useState([]);
+  const [categoryStats, setCategoryStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +49,14 @@ export default function AdminDashboard() {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setAdminStats(statsRes.data);
+            
+            // Fetch category stats for super admin
+            if (currentUser.role === 'super_admin' || currentUser.role === 'admin') {
+                const categoryRes = await api.get("/admin/category-stats", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setCategoryStats(categoryRes.data);
+            }
             
              // Fetch Recent Movies (handle paginated response)
             const moviesRes = await api.get("/movies", {
@@ -75,7 +85,7 @@ export default function AdminDashboard() {
     fetchDashboardData();
   }, [user]);
 
-  const isSuperAdmin = dbUser?.role === "super_admin";
+  const isSuperAdmin = dbUser?.role === "super_admin" || dbUser?.role === "admin";
 
   // Super Admin Stats: 5 Cards Grid (Screens Removed)
   const superAdminStats = adminStats ? [
@@ -261,34 +271,83 @@ export default function AdminDashboard() {
                 </CardContent>
             </Card>
 
-            {/* Upcoming Schedule */}
-            <Card className="bg-zinc-900/40 border-zinc-900 rounded-2xl overflow-hidden">
-                <CardHeader className="px-6 py-5 border-b border-zinc-900">
-                    <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Upcoming Shows</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 space-y-2">
-                    {upcomingShows.map((show: any) => (
-                        <div
-                            key={show._id}
-                            className="flex items-center gap-4 p-3 rounded-lg hover:bg-zinc-800/50 cursor-pointer group"
-                            onClick={() => router.push("/admin/shows")}
-                        >
-                            <div className="w-12 h-10 rounded-lg bg-zinc-800 flex flex-col items-center justify-center border border-zinc-700/50">
-                                <span className="text-[9px] font-bold text-zinc-500 uppercase">
-                                    {new Date(show.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-                                </span>
-                                <span className="text-sm font-bold text-white">{show.time}</span>
+            {/* Upcoming Schedule or Category Stats */}
+            {isSuperAdmin ? (
+                <Card className="bg-zinc-900/40 border-zinc-900 rounded-2xl overflow-hidden">
+                    <CardHeader className="px-6 py-5 border-b border-zinc-900">
+                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Movies by Category</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                        {categoryStats.length > 0 ? (
+                            <div>
+                                <div style={{ width: '100%', height: '250px' }}>
+                                    <PieChart width={400} height={250}>
+                                        <Pie
+                                            data={categoryStats}
+                                            cx="50%"
+                                            cy="50%"
+                                            outerRadius={80}
+                                            fill="#8884d8"
+                                            dataKey="count"
+                                            label
+                                        >
+                                            {categoryStats.map((entry: any, index: number) => (
+                                                <Cell key={`cell-${index}`} fill={`hsl(${(index * 137.5) % 360}, 70%, 50%)`} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </div>
+                                
+                                {/* Custom Legend */}
+                                <div className="mt-4 grid grid-cols-2 gap-2">
+                                    {categoryStats.map((entry: any, index: number) => (
+                                        <div key={`legend-${index}`} className="flex items-center gap-2">
+                                            <div 
+                                                className="w-3 h-3 rounded-full" 
+                                                style={{ backgroundColor: `hsl(${(index * 137.5) % 360}, 70%, 50%)` }}
+                                            ></div>
+                                            <span className="text-xs text-zinc-300 font-medium">
+                                                {entry.name} ({entry.count})
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-semibold text-white">{show.movie?.title}</p>
-                                <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">{show.theaterId?.name}</p>
+                        ) : (
+                            <p className="text-zinc-500 text-center py-4 text-sm">No category data available</p>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : (
+                <Card className="bg-zinc-900/40 border-zinc-900 rounded-2xl overflow-hidden">
+                    <CardHeader className="px-6 py-5 border-b border-zinc-900">
+                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Upcoming Shows</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 space-y-2">
+                        {upcomingShows.map((show: any) => (
+                            <div
+                                key={show._id}
+                                className="flex items-center gap-4 p-3 rounded-lg hover:bg-zinc-800/50 cursor-pointer group"
+                                onClick={() => router.push("/admin/shows")}
+                            >
+                                <div className="w-12 h-10 rounded-lg bg-zinc-800 flex flex-col items-center justify-center border border-zinc-700/50">
+                                    <span className="text-[9px] font-bold text-zinc-500 uppercase">
+                                        {new Date(show.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                    <span className="text-sm font-bold text-white">{show.time}</span>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-semibold text-white">{show.movie?.title}</p>
+                                    <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wide">{show.theaterId?.name}</p>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-white transition-all transform group-hover:translate-x-1" />
                             </div>
-                            <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-white transition-all transform group-hover:translate-x-1" />
-                        </div>
-                    ))}
-                    {upcomingShows.length === 0 && <p className="text-zinc-500 text-center py-4 text-sm">No upcoming shows</p>}
-                </CardContent>
-            </Card>
+                        ))}
+                        {upcomingShows.length === 0 && <p className="text-zinc-500 text-center py-4 text-sm">No upcoming shows</p>}
+                    </CardContent>
+                </Card>
+            )}
         </div>
       </div>
     </DashboardLayout>

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
 import Pagination from "@/components/ui/pagination";
 import { X, User as UserIcon, Building, CreditCard, Clock as ClockIcon, Armchair } from "lucide-react";
+import api from "@/lib/axios";
 
 export default function AdminBookings() {
     const { getToken } = useAuth();
@@ -28,19 +29,19 @@ export default function AdminBookings() {
             const token = await getToken();
             
             // Fetch bookings with pagination
-            const bookingsRes = await fetch(`http://localhost:5000/bookings/theater?page=${page}&limit=5`, {
+            const bookingsRes = await api.get(`bookings/theater?page=${page}&limit=5`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const bookingsData = await bookingsRes.json();
+            const bookingsData = bookingsRes.data;
             setBookings(Array.isArray(bookingsData.bookings) ? bookingsData.bookings : []);
             setTotalPages(bookingsData.totalPages || 1);
             setTotalBookings(bookingsData.totalBookings || 0);
 
             // Fetch movies for filter
-            const moviesRes = await fetch("http://localhost:5000/organization-movies", {
+            const moviesRes = await api.get("organization-movies", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            const moviesData = await moviesRes.json();
+            const moviesData = moviesRes.data;
             setMovies(Array.isArray(moviesData) ? moviesData.map((m: any) => m.movieId) : []);
 
         } catch (error) {

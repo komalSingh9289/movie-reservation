@@ -20,4 +20,20 @@ const router = express.Router();
  */
 router.get("/stats", isAdmin, adminController.getAdminStats);
 
+/**
+ * @swagger
+ * /admin/category-stats:
+ *   get:
+ *     summary: Get movies count by category for Super Admin dashboard
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Category statistics
+ *       403:
+ *         description: Access denied
+ */
+router.get("/category-stats", isAdmin, adminController.getCategoryStats);
+
 export default router;

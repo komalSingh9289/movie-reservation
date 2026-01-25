@@ -6,7 +6,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Search, Loader2, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import axios from "axios";
+import api from "@/lib/axios";
 
 // Define Movie Interface matching backend response
 interface Movie {
@@ -42,10 +42,10 @@ export default function MoviesPage() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [moviesRes, categoriesRes, favoritesRes] = await Promise.all([
-        axios.get(`http://localhost:5000/movies?showingOnly=true&page=${page}&limit=12`),
-        axios.get("http://localhost:5000/categories"),
+        api.get(`movies?showingOnly=true&page=${page}&limit=12`),
+        api.get("categories"),
         isSignedIn 
-          ? axios.get("http://localhost:5000/users/favorites", { headers }).catch(() => ({ data: [] }))
+          ? api.get("users/favorites", { headers }).catch(() => ({ data: [] }))
           : Promise.resolve({ data: [] })
       ]);
 
@@ -84,7 +84,7 @@ export default function MoviesPage() {
     try {
       setTogglingFavorite(movieId);
       const token = await getToken();
-      const res = await axios.post(`http://localhost:5000/users/favorites/${movieId}`, {}, {
+      const res = await api.post(`users/favorites/${movieId}`, {}, {
          headers: { Authorization: `Bearer ${token}` }
       });
       setFavorites(res.data.favorites);

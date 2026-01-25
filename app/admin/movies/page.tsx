@@ -32,29 +32,27 @@ export default function AdminMoviesPage() {
       const token = await getToken();
       
       // 1. Fetch DB user to get role
-      const userRes = await fetch("http://localhost:5000/users/sync", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ clerkId: user?.id })
+      const userRes = await api.post("users/sync", { clerkId: user?.id }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      const userData = await userRes.json();
+      const userData = userRes.data;
       setDbUser(userData);
 
       // 2. Fetch global movies with pagination
-      const globalRes = await fetch(`http://localhost:5000/movies?page=${page}&limit=12`, {
+      const globalRes = await api.get(`movies?page=${page}&limit=12`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const globalData = await globalRes.json();
+      const globalData = globalRes.data;
       setGlobalMovies(Array.isArray(globalData.movies) ? globalData.movies : []);
       setTotalPages(globalData.totalPages || 1);
       setTotalMovies(globalData.totalMovies || 0);
 
       // 3. Fetch my organization collection if theater admin
       if (userData.role === 'admin') {
-        const myRes = await fetch("http://localhost:5000/organization-movies", {
+        const myRes = await api.get("organization-movies", {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const myData = await myRes.json();
+        const myData = myRes.data;
         setMyCollection(Array.isArray(myData) ? myData.map(m => m.movieId._id) : []);
       }
 
@@ -73,24 +71,15 @@ export default function AdminMoviesPage() {
     setAddingId(movieId);
     try {
       const token = await getToken();
-      const response = await fetch("http://localhost:5000/organization-movies", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ movieId }),
+      const response = await api.post("organization-movies", { movieId }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        setMyCollection([...myCollection, movieId]);
-        toast.success("Movie added to collection!");
-      } else {
-        const error = await response.json();
-        toast.error(error.message || "Failed to add movie");
-      }
+      setMyCollection([...myCollection, movieId]);
+      toast.success("Movie added to collection!");
     } catch (error) {
       console.error("Error adding movie:", error);
+      toast.error(error.response?.data?.message || "Failed to add movie");
     } finally {
       setAddingId(null);
     }

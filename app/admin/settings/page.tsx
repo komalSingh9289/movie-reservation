@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth, useUser } from "@clerk/nextjs";
+import api from "@/lib/axios";
 
 export default function SettingsPage() {
     const { getToken } = useAuth();
@@ -29,20 +30,15 @@ export default function SettingsPage() {
             try {
                 const token = await getToken();
                 // We'll use the sync endpoint to get current dbUser which has org/theater IDs
-                const res = await fetch("http://localhost:5000/users/sync", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        clerkId: user?.id,
-                        name: user?.fullName,
-                        email: user?.primaryEmailAddress?.emailAddress,
-                        avatar: user?.imageUrl,
-                    }),
+                const res = await api.post("users/sync", {
+                    clerkId: user?.id,
+                    name: user?.fullName,
+                    email: user?.primaryEmailAddress?.emailAddress,
+                    avatar: user?.imageUrl,
+                }, {
+                    headers: { Authorization: `Bearer ${token}` }
                 });
-                const dbUser = await res.json();
+                const dbUser = res.data;
 
                 if (dbUser.organizationId && dbUser.theaterId) {
                     // Fetch organization and theater details
@@ -51,10 +47,10 @@ export default function SettingsPage() {
                     // I realized I didn't add GET /theaters/me. Let me add it quickly or just use the update route to "get" if I modify it.
                     // Better to just fetch the specific theater.
                     
-                    const theaterRes = await fetch(`http://localhost:5000/theaters/me`, {
+                    const theaterRes = await api.get(`theaters/me`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
-                    const myTheater = await theaterRes.json();
+                    const myTheater = theaterRes.data;
                     
                     if (myTheater && !myTheater.message) {
                         setFormData({
@@ -103,24 +99,14 @@ export default function SettingsPage() {
 
         try {
             const token = await getToken();
-            const response = await fetch("http://localhost:5000/theaters/me", {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(formData),
+            const response = await api.put("theaters/me", formData, {
+                headers: { Authorization: `Bearer ${token}` }
             });
 
-            if (response.ok) {
-                alert("Settings updated successfully!");
-            } else {
-                const error = await response.json();
-                alert(error.message || "Update failed");
-            }
+            alert("Settings updated successfully!");
         } catch (error) {
             console.error("Update error:", error);
-            alert("An unexpected error occurred");
+            alert(error.response?.data?.message || "Update failed");
         } finally {
             setLoading(false);
         }

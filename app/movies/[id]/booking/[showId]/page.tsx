@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Loader2, Armchair, ChevronLeft, Timer } from "lucide-react";
-import axios from "axios";
+import api from "@/lib/axios";
 import { cn } from "@/lib/utils";
 import Script from "next/script";
 import { io, Socket } from "socket.io-client";
@@ -128,8 +128,8 @@ export default function BookingPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const movieRes = await axios.get(`http://localhost:5000/movies/${id}`);
-        const showRes = await axios.get(`http://localhost:5000/shows/${showId}`);
+        const movieRes = await api.get(`movies/${id}`);
+        const showRes = await api.get(`shows/${showId}`);
 
         setMovie(movieRes.data);
         setShow(showRes.data);
@@ -159,8 +159,8 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
   try {
     if (isMine) {
       // UNLOCK
-      await axios.patch(
-        `http://localhost:5000/shows/${showId}/unlock-seats`,
+      await api.patch(
+        `shows/${showId}/unlock-seats`,
         { seats: [seatId] },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -177,8 +177,8 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
 
     } else {
       // LOCK
-      await axios.patch(
-        `http://localhost:5000/shows/${showId}/lock-seats`,
+      await api.patch(
+        `shows/${showId}/lock-seats`,
         { seats: [seatId] },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -214,7 +214,7 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
       
       const fetchData = async () => {
         try {
-          const showRes = await axios.get(`http://localhost:5000/shows/${showId}`);
+          const showRes = await api.get(`shows/${showId}`);
           setShow(showRes.data);
         } catch (err) {
           console.error("Refresh error:", err);
@@ -238,8 +238,8 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
       const seatsToUnlock = myLockedSeatsRef.current;
       if (seatsToUnlock.length > 0) {
         getToken().then(token => {
-          axios.patch(
-            `http://localhost:5000/shows/${showId}/unlock-seats`,
+          api.patch(
+            `shows/${showId}/unlock-seats`,
             { seats: seatsToUnlock },
             { headers: { Authorization: `Bearer ${token}` } }
           ).catch(err => console.error("Unmount unlock error:", err));
@@ -267,8 +267,8 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
       setBooking(true);
       const token = await getToken();
 
-      const res = await axios.post(
-        "http://localhost:5000/bookings",
+      const res = await api.post(
+        "bookings",
         {
           showId: show._id,
           // Use mySeats for the booking payload to match visual selection
@@ -291,8 +291,8 @@ const handleSeatClick = async (seatId: string, seat: Seat) => {
 
       // Poll verification
       setTimeout(async () => {
-        const verifyRes = await axios.post(
-          "http://localhost:5000/bookings/verify",
+        const verifyRes = await api.post(
+          "bookings/verify",
           { orderId: booking.orderId },
           { headers: { Authorization: `Bearer ${token}` } }
         );
